@@ -231,7 +231,7 @@ async function loadCorr(){
   try{
     const r=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
       method:'POST',
-      headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':JSON.stringify({path:CORR_PATH}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}
+      headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':dbxArg({path:CORR_PATH}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}
     });
     corrCache=r.ok?await r.json():{...CORR_DEF};
   }catch{corrCache={...CORR_DEF};}
@@ -240,7 +240,7 @@ async function saveCorr(){
   const tok=getToken();if(!tok||!corrCache)return;
   await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
     method:'POST',
-    headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':JSON.stringify({path:CORR_PATH,mode:'overwrite',mute:true}),'Content-Type':'application/octet-stream','X-Dropbox-URL':'https://content.dropboxapi.com/2/files/upload'},
+    headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':dbxArg({path:CORR_PATH,mode:'overwrite',mute:true}),'Content-Type':'application/octet-stream','X-Dropbox-URL':'https://content.dropboxapi.com/2/files/upload'},
     body:JSON.stringify(corrCache)
   }).catch(()=>{});
 }
@@ -256,6 +256,7 @@ function nextCorr(k){
 function getBDKey(t){return{cot_sm:'cot_sm',inf_sm:'inf_sm',cot_cg:'cot_cg',inf_cg:'inf_cg',mant_sillon:'mant',mant_bomba:'mant',mant_concentrador:'mant'}[t]||t;}
 function addBD(k,r){try{const b=JSON.parse(localStorage.getItem('bd_'+k)||'[]');b.push(r);localStorage.setItem('bd_'+k,JSON.stringify(b));}catch{}}
 function getToken(){return localStorage.getItem('dbx_token')||'';}
+function dbxArg(obj){return JSON.stringify(obj).replace(/[^\x00-\x7F]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));}
 
 // ══ HELPERS ══
 function hoy(){return new Date().toISOString().split('T')[0];}
@@ -500,7 +501,9 @@ function calcSM(){
   if(s)s.textContent=fmtP(sub);if(iv)iv.textContent=fmtP(iva);if(t)t.textContent=fmtP(sub+iva);
 }
 function calcCG(){
-  const hon=parseFloat(document.getElementById('iHon')?.value)||0;
+  let hon=0;
+  document.querySelectorAll('#itemsCont .item-row input[type=number]').forEach(i=>hon+=parseFloat(i.value)||0);
+  if(!hon)hon=parseFloat(document.getElementById('iHon')?.value)||0;
   const pct=parseFloat(document.getElementById('iRetPct')?.value)||14.5;
   const ret=Math.round(hon*pct/100);
   const h=document.getElementById('cHon'),r=document.getElementById('cRet'),tc=document.getElementById('cTotCG');
@@ -514,7 +517,8 @@ function getItems(tipo){
     if(desc||val)items.push({desc,val});
   });
   if(tipo==='cot_cg'){
-    const hon=parseFloat(document.getElementById('iHon')?.value)||0;
+    let hon=items.reduce((a,i)=>a+i.val,0);
+    if(!hon)hon=parseFloat(document.getElementById('iHon')?.value)||0;
     const pct=parseFloat(document.getElementById('iRetPct')?.value)||14.5;
     const ret=Math.round(hon*pct/100);
     return{cg:true,items,honorario:hon,pct,retencion:ret,total:hon-ret,tipo_pago:document.getElementById('iTipoPago')?.value||'Boleta'};
@@ -814,7 +818,7 @@ function renderItemsDoc(doc,secCls,hdrCls){
     return`<div class="doc-sec ${secCls}">Detalle del Trabajo</div>
     <table class="doc-items ${cls}">
       <thead><tr><th style="width:70%">Descripción del Trabajo</th><th style="text-align:right">Valor</th></tr></thead>
-      <tbody>${m.items.map(i=>`<tr><td>${i.desc||'—'}</td><td class="amt">—</td></tr>`).join('')}</tbody>
+      <tbody>${m.items.map(i=>`<tr><td>${i.desc||'—'}</td><td class="amt">${i.val?fmtP(i.val):'—'}</td></tr>`).join('')}</tbody>
     </table>
     <div class="doc-totales-wrap">
       <div class="doc-banco"><strong>Datos de Pago</strong>${bancoDatos}</div>
@@ -936,12 +940,15 @@ async function guardar(){
   showProg('Generando PDF...','Puede tomar 15-20 segundos');
 
   try{
+    window.scrollTo(0,0);
+    await new Promise(r=>setTimeout(r,200));
     const el=document.getElementById('docPDF');
     const pdfBlob=await html2pdf().set({
       margin:[6,6,6,6],filename:`${LABEL_A[doc.tipo]} N°${num}.pdf`,
       image:{type:'jpeg',quality:0.95},
-      html2canvas:{scale:2,useCORS:true,logging:false},
-      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+      html2canvas:{scale:2,useCORS:true,logging:false,scrollY:0,scrollX:0,windowWidth:900},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+      pagebreak:{mode:['css','legacy']}
     }).from(el).outputPdf('blob');
 
     showProg('Subiendo a Dropbox...','Creando carpetas automáticamente');
@@ -955,7 +962,7 @@ async function guardar(){
     const carpeta=`${fechaFmt} ${lblArch} N°${num}`;
     const archivo=`${lblArch} N°${num}.pdf`;
     const ruta=`/Soporte Medico/${nomCli}/${anio}/${nombreMes}/${carpeta}/${archivo}`;
-    const rutaArg=JSON.stringify({path:ruta,mode:'overwrite',autorename:true,mute:false});
+    const rutaArg=dbxArg({path:ruta,mode:'overwrite',autorename:true,mute:false});
 
     const buf=await pdfBlob.arrayBuffer();
     const resp=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
@@ -1009,7 +1016,7 @@ async function guardarEnExcel(doc,num){
     // Descargar el archivo Excel actual
     const dlResp=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
       method:'POST',
-      headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':JSON.stringify({path:EXCEL_PATH}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}
+      headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':dbxArg({path:EXCEL_PATH}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}
     });
     if(!dlResp.ok){console.warn('No se pudo descargar el Excel BD');return;}
     const xlsxBuf=await dlResp.arrayBuffer();
@@ -1071,7 +1078,7 @@ async function guardarEnExcel(doc,num){
       method:'POST',
       headers:{
         'Authorization':'Bearer '+tok,
-        'Dropbox-API-Arg':JSON.stringify({path:EXCEL_PATH,mode:'overwrite',mute:true}),
+        'Dropbox-API-Arg':dbxArg({path:EXCEL_PATH,mode:'overwrite',mute:true}),
         'Content-Type':'application/octet-stream',
         'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/upload'
       },
