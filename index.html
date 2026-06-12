@@ -24,7 +24,7 @@ button{cursor:pointer;font-family:inherit}
 .tarjeta{background:#fff;border-radius:var(--ra);padding:16px 14px;border:1.5px solid var(--grb);cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:6px}
 .tarjeta:hover,.tarjeta:active{border-color:var(--azc);background:var(--azs);transform:translateY(-1px);box-shadow:var(--sh)}
 .tarjeta-icono{font-size:22px}.tarjeta-nombre{font-size:14px;font-weight:600;color:var(--az)}.tarjeta-desc{font-size:12px;color:var(--txs)}
-.tarjeta.mant{border-left:3px solid var(--na)}.tarjeta.cg{border-left:3px solid var(--tl)}.tarjeta.sm{border-left:3px solid var(--azc)}
+.tarjeta.mant{border-left:3px solid #203864}.tarjeta.cg{border-left:3px solid var(--tl)}.tarjeta.sm{border-left:3px solid var(--azc)}
 .btn-menu{background:#fff;border:1.5px dashed var(--grb);border-radius:var(--ra);padding:12px 16px;width:100%;text-align:left;font-size:14px;color:var(--txs);margin-top:8px;display:flex;align-items:center;gap:8px}
 .btn-menu:hover{border-color:var(--azc);color:var(--az)}
 .form-page{padding:20px;max-width:700px;margin:0 auto}
@@ -90,13 +90,13 @@ button{cursor:pointer;font-family:inherit}
 .doc-hdr-numbox .fecha{font-size:10px;opacity:.85;margin-top:3px;color:#fff}
 /* Título tipo debajo del header */
 .doc-tipo-bar{text-align:center;padding:8px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;border-bottom:1px solid var(--grb)}
-.doc-tipo-bar.sm{color:var(--az)}.doc-tipo-bar.cg{color:var(--tl)}.doc-tipo-bar.mant{color:var(--na)}
+.doc-tipo-bar.sm{color:var(--az)}.doc-tipo-bar.cg{color:var(--tl)}.doc-tipo-bar.mant{color:#203864}
 .doc-body{padding:18px 24px}
 /* Dos columnas cliente/equipo */
 .doc-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
 .doc-meta-blq{border:1px solid var(--grb);border-radius:6px;overflow:hidden}
 .doc-meta-tit{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#fff;padding:5px 10px;margin-bottom:0}
-.doc-meta-tit.sm{background:var(--az)}.doc-meta-tit.cg{background:var(--tl)}.doc-meta-tit.mant{background:var(--na)}
+.doc-meta-tit.sm{background:var(--az)}.doc-meta-tit.cg{background:var(--tl)}.doc-meta-tit.mant{background:#203864}
 .doc-meta-body{padding:8px 10px;min-height:120px}
 .doc-fila{display:flex;gap:6px;margin-bottom:3px;font-size:12px;line-height:1.4}
 .doc-fila .k{color:var(--txs);min-width:60px;flex-shrink:0;font-size:11px}
@@ -105,7 +105,7 @@ button{cursor:pointer;font-family:inherit}
 .doc-sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;border-bottom:2px solid;padding:5px 10px 4px;margin:14px 0 8px;border-radius:3px 3px 0 0}
 .doc-sec.sm{color:#fff;background:var(--az);border-color:var(--az)}
 .doc-sec.cg{color:#fff;background:var(--tl);border-color:var(--tl)}
-.doc-sec.mant{color:#fff;background:var(--na);border-color:var(--na)}
+.doc-sec.mant{color:#fff;background:#203864;border-color:#203864}
 .doc-detalle{background:var(--gr);border-radius:0 0 6px 6px;padding:10px 12px;margin-bottom:6px;font-size:13px;line-height:1.6;border:1px solid var(--grb);border-top:none;word-break:break-word;overflow-wrap:break-word}
 /* Tabla ítems cotización - como PDF referencia */
 .doc-items{width:100%;border-collapse:collapse;margin-bottom:0;font-size:12px}
@@ -631,10 +631,10 @@ function renderFormChecklist(tipo){
     <div style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead><tr>
-        <th style="background:var(--na);color:#fff;padding:7px 10px;text-align:center;width:60px">Estado</th>
-        <th style="background:var(--na);color:#fff;padding:7px 10px;text-align:left">Ítem</th>
-        <th style="background:var(--na);color:#fff;padding:7px 10px;text-align:left">Observaciones</th>
-        <th style="background:var(--na);color:#fff;padding:7px 10px;text-align:left">Modelo</th>
+        <th style="background:#203864;color:#fff;padding:7px 10px;text-align:center;width:60px">Estado</th>
+        <th style="background:#203864;color:#fff;padding:7px 10px;text-align:left">Ítem</th>
+        <th style="background:#203864;color:#fff;padding:7px 10px;text-align:left">Observaciones</th>
+        <th style="background:#203864;color:#fff;padding:7px 10px;text-align:left">Modelo</th>
       </tr></thead>
       <tbody id="resumenBody">
         ${cl.resumen.map((item,i)=>`<tr>
@@ -901,7 +901,7 @@ function renderItemsDoc(doc,secCls,hdrCls){
 
 function renderChecklistDoc(cl,secCls,tipo,tec){
   const isCG=esCG(tipo)||tecnicoEsCG(tec);
-  const thBg=esMant(tipo)?'var(--na)':isCG?'var(--tl)':'var(--az)';
+  const thBg=esMant(tipo)?'#203864':isCG?'var(--tl)':'var(--az)';
   const resTblCls=isCG?'cg':'';
 
   // Sección 1
@@ -1087,35 +1087,46 @@ async function guardarEnExcel(doc,num){
 
     let sheetName='';let newRow=[];
     if(tipo==='cot_sm'){
+      // BD_cotización: A=N°cot, B=Fecha, C=Nombre cliente, D=Rut, E=Dir, F=Tel, G=Email,
+      // H=Fecha ST, I=Equipo, J=Marca, K=Modelo, L=N°Serie, M=Tipo mant, N=Desc, O=Detalle,
+      // P=Total, Q=IVA, R=Total+IVA, S=Tipo pago, T=Año  (20 cols)
       sheetName='BD_cotización';
       const m=doc.items||{};
       const detalles=m.items?m.items.map(i=>i.desc).join(' / '):'';
-      newRow=[null,num,doc.fecha_doc,cli.n+(cli.d?' - '+cli.d:''),cli.n,cli.r,cli.a,cli.t,cli.e,
-        fechasServStr,equ.l,equ.l,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,
+      newRow=[num,fmtF(doc.fecha_doc),cli.n+(cli.d?' - '+cli.d:''),cli.r,cli.a,cli.t,cli.e,
+        fechasServStr,equ.l,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,
         m.subtotal||0,m.iva||0,m.total||0,m.tipo_pago||'',doc.fecha_doc?doc.fecha_doc.substring(0,4):''];
     } else if(tipo==='inf_sm'){
+      // BD_informe: A=Código, B=Fecha, C=Nombre, D=Rut, E=Dir, F=Tel, G=Email,
+      // H=Fecha ST, I=Equipo, J=Marca, K=Modelo, L=Serie, M=Tipo mant, N=Desc, O=Detalle, P=Resultado (16 cols)
       sheetName='BD_informe';
       const detalles=(doc.procs||[]).join(' / ');
-      newRow=[null,num,doc.fecha_doc,cli.n+(cli.d?' - '+cli.d:''),cli.n,cli.r,cli.a,cli.t,cli.e,
-        fechasServStr,equ.l,equ.l,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,doc.resultado||''];
+      newRow=[num,fmtF(doc.fecha_doc),cli.n+(cli.d?' - '+cli.d:''),cli.r,cli.a,cli.t,cli.e,
+        fechasServStr,equ.l,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,doc.resultado||''];
     } else if(tipo==='cot_cg'){
+      // BD_cotización_CG: A=N°cot, B=Fecha, C=Nombre, D=Rut, E=Dir, F=Tel, G=Email,
+      // H=Fecha ST, I=Equipo, J=Marca, K=Modelo, L=Serie, M=Tipo mant, N=Desc, O=Detalle,
+      // P=Total Honorario, Q=Retención$, R=Total, S=Año, T=Retención%, U=Tipo pago (21 cols)
       sheetName='BD_cotización_CG';
       const m=doc.items||{};
       const detalles=m.items?m.items.map(i=>i.desc).join(' / '):'';
-      newRow=[null,num,doc.fecha_doc,cli.n+(cli.d?' - '+cli.d:''),cli.n,cli.r,cli.a,cli.t,cli.e,
-        fechasServStr,equ.l,equ.l,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,
+      newRow=[num,fmtF(doc.fecha_doc),cli.n+(cli.d?' - '+cli.d:''),cli.r,cli.a,cli.t,cli.e,
+        fechasServStr,equ.l,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,
         m.honorario||0,m.retencion||0,m.total||0,doc.fecha_doc?doc.fecha_doc.substring(0,4):'',m.pct||14.5,m.tipo_pago||''];
     } else if(tipo==='inf_cg'){
+      // BD_informe_CG: same structure as BD_informe (16 cols)
       sheetName='BD_informe_CG';
       const detalles=(doc.procs||[]).join(' / ');
-      newRow=[null,num,doc.fecha_doc,cli.n+(cli.d?' - '+cli.d:''),cli.n,cli.r,cli.a,cli.t,cli.e,
-        fechasServStr,equ.l,equ.l,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,doc.resultado||''];
+      newRow=[num,fmtF(doc.fecha_doc),cli.n+(cli.d?' - '+cli.d:''),cli.r,cli.a,cli.t,cli.e,
+        fechasServStr,equ.l,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,doc.resultado||''];
     } else if(esMant(tipo)){
+      // BD_mant: A=Fecha, B=Empresa, C=Tipo informe, D=Nombre, E=Rut, F=Dir, G=Tel, H=Email,
+      // I=Equipo, J=Marca, K=Modelo, L=Serie, M=Frecuencia, N=Estado mant (14 cols)
       sheetName='BD_mant';
-      const tipoInf=NOMBRES[tipo].replace('\\n',' ');
+      const tipoInf=(NOMBRES[tipo]||tipo).replace(/\n/g,' ');
       const estadoMant=doc.checklist?.resumen?.map(r=>r.item+(r.estado?' ('+r.estado+')':'')).join(', ')||'';
-      newRow=[doc.fecha_doc,empresa,tipoInf,cli.n,cli.r,cli.a,cli.t,cli.e,
-        equ.t,equ.m,equ.o,equ.s,doc.frecuencia||'',estadoMant];
+      newRow=[fmtF(doc.fecha_doc),empresa,tipoInf,cli.n,cli.r,cli.a,cli.t,cli.e,
+        equ.l,equ.m,equ.o,equ.s,doc.frecuencia||'',estadoMant];
     }
 
     if(!sheetName||!wb.SheetNames.includes(sheetName)){
