@@ -335,7 +335,7 @@ function getLogo(tipo,tec){return(esCG(tipo)||tecnicoEsCG(tec))?IMG.logo_cg:IMG.
 function getFirmaTimbre(tec){return tecnicoEsCG(tec)?{firma:IMG.firma_t,timbre:IMG.timbre_cg}:{firma:IMG.firma_t,timbre:IMG.timbre_sm};}
 function getEmpresa(tipo,tec){return(esCG(tipo)||tecnicoEsCG(tec))?E_CG:E_SM;}
 function getHdrCls(tipo,tec){return(esCG(tipo)||tecnicoEsCG(tec))?'cg':'sm';}
-function getSecCls(tipo,tec){return esMant(tipo)?'mant':(esCG(tipo)||tecnicoEsCG(tec))?'cg':'sm';}
+function getSecCls(tipo,tec){return(esCG(tipo)||tecnicoEsCG(tec))?'cg':'sm';}
 
 const NOMBRES={
   cot_sm:'Cotización Servicio Técnico',inf_sm:'Informe Servicio Técnico',
@@ -792,6 +792,7 @@ function renderPreview(doc){
       </div>
 
       <div class="doc-body">
+        ${esMant(tipo)?`<div class="doc-mant-titulo" style="text-align:center;font-size:11.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:${(esCG(tipo)||tecnicoEsCG(tec))?'var(--tl)':'var(--az)'};padding:8px 0 6px;border-bottom:1.5px solid ${(esCG(tipo)||tecnicoEsCG(tec))?'var(--tl)':'var(--az)'};margin-bottom:10px">${NOMBRES[tipo].replace('\n',' ')}</div>`:''}
         <!-- CLIENTE + EQUIPO en dos columnas -->
         <div class="doc-meta">
           <div class="doc-meta-blq">
@@ -901,7 +902,7 @@ function renderItemsDoc(doc,secCls,hdrCls){
 
 function renderChecklistDoc(cl,secCls,tipo,tec){
   const isCG=esCG(tipo)||tecnicoEsCG(tec);
-  const thBg=esMant(tipo)?'#203864':isCG?'var(--tl)':'var(--az)';
+  const thBg=isCG?'var(--tl)':'var(--az)';
   const resTblCls=isCG?'cg':'';
 
   // Sección 1
@@ -928,10 +929,10 @@ function renderChecklistDoc(cl,secCls,tipo,tec){
       <th style="background:${thBg}">Modelo</th>
     </tr></thead>
     <tbody>
-      ${cl.resumen.map(r=>`<tr>
+      ${cl.resumen.map(r=>`<tr style="break-inside:avoid;page-break-inside:avoid">
         <td style="text-align:center;font-size:16px">${r.estado==='OK'?'✅':r.estado==='NO'?'❌':'—'}</td>
         <td>${r.item}</td>
-        <td>${r.obs||'—'}</td>
+        <td style="white-space:pre-wrap;word-break:break-word">${r.obs||'—'}</td>
         <td>${r.modelo||'—'}</td>
       </tr>`).join('')}
     </tbody>
@@ -977,7 +978,7 @@ async function guardar(){
     const ni=document.getElementById('iNombreFirmante');
     if(ni&&!document.getElementById('nomFirmanteDisp')){
       const sp=document.createElement('div');sp.id='nomFirmanteDisp';sp.style.cssText='font-size:13px;font-weight:600;text-align:center;margin-top:3px;';sp.textContent=nomFirmante;
-      ni.style.display='none';ni.parentElement.appendChild(sp);
+      ni.style.display='none';ni.parentElement.insertBefore(sp,ni);
     }
   }
 
