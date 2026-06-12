@@ -792,7 +792,7 @@ function renderPreview(doc){
       </div>
 
       <div class="doc-body">
-        ${esMant(tipo)?`<div class="doc-mant-titulo" style="text-align:center;font-size:11.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:${(esCG(tipo)||tecnicoEsCG(tec))?'var(--tl)':'var(--az)'};padding:8px 0 6px;border-bottom:1.5px solid ${(esCG(tipo)||tecnicoEsCG(tec))?'var(--tl)':'var(--az)'};margin-bottom:10px">${NOMBRES[tipo].replace('\n',' ')}</div>`:''}
+        <div style="text-align:center;font-size:11.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:${(esCG(tipo)||tecnicoEsCG(tec))?'var(--tl)':'var(--az)'};padding:8px 0 6px;border-bottom:1.5px solid ${(esCG(tipo)||tecnicoEsCG(tec))?'var(--tl)':'var(--az)'};margin-bottom:10px">${esMant(tipo)?NOMBRES[tipo].replace('\n',' '):esCot(tipo)?'Cotización Servicio Técnico':'Informe Servicio Técnico'}</div>
         <!-- CLIENTE + EQUIPO en dos columnas -->
         <div class="doc-meta">
           <div class="doc-meta-blq">
