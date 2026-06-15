@@ -1163,8 +1163,6 @@ async function guardarEnExcel(doc,num,preloadedZip){
     }
     if(!sheetName)return;
 
-    // Abrir como ZIP y manipular XML directamente para preservar formatos/tablas
-    const zip=await JSZip.loadAsync(xlsxBuf);
     const wbXml=await zip.file('xl/workbook.xml').async('text');
     const wsPath=await _xlsxResolveSheet(zip,wbXml,sheetName);
     if(!wsPath){console.warn('Hoja no encontrada:',sheetName);return;}
