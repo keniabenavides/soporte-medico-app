@@ -121,8 +121,8 @@ button{cursor:pointer;font-family:inherit}
 .doc-items.sm tr.tot-row td{color:var(--az);border-color:var(--az)}
 .doc-items.cg tr.tot-row td{color:var(--tl);border-color:var(--tl)}
 /* Sección banco + totales (como PDF referencia) */
-.doc-totales-wrap{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:8px;border:1px solid var(--grb);border-radius:6px;overflow:hidden}
-.doc-banco{padding:10px 12px;font-size:11px;line-height:1.7;color:var(--tx);background:#f9fafb}
+.doc-totales-wrap{break-inside:avoid;page-break-inside:avoid}display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:8px;border:1px solid var(--grb);border-radius:6px;overflow:hidden}
+.doc-banco{padding:10px 12px;font-size:11px;line-height:1.7;color:var(--tx);background:#f9fafb;break-inside:avoid;page-break-inside:avoid}
 .doc-banco strong{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--txs);margin-bottom:4px}
 .doc-montos{display:flex;flex-direction:column;border-left:1px solid var(--grb)}
 .doc-monto-fila{display:flex;justify-content:space-between;align-items:center;padding:7px 12px;border-bottom:1px solid var(--grb);font-size:12px}
@@ -154,7 +154,7 @@ button{cursor:pointer;font-family:inherit}
 .firma-nombre-input{width:100%;border:none;border-bottom:1.5px solid var(--tx);padding:4px 2px;font-size:12px;text-align:center;background:transparent;font-family:inherit;color:var(--tx);text-transform:uppercase}
 .firma-nombre-input:focus{outline:none;border-color:var(--azc)}
 .firma-tec-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;width:100%;background:#fff;padding:4px;border-radius:6px}
-.firma-tec-wrap img.firma-img{max-height:65px;object-fit:contain;mix-blend-mode:multiply}
+.firma-tec-wrap img.firma-img{max-height:85px;object-fit:contain;mix-blend-mode:multiply}
 .firma-tec-wrap img.timbre-img{max-height:52px;object-fit:contain;mix-blend-mode:multiply;opacity:.9}
 /* MANTENEDOR */
 .mant-page{padding:20px;max-width:700px;margin:0 auto}
@@ -769,7 +769,7 @@ function renderPreview(doc){
   const lbl=LABEL_A[tipo];
 
   const metaTitCls='doc-meta-tit '+hdrCls;
-  const BANCO_SM=`<div class="doc-banco"><strong>Datos de pago</strong>Cuenta: Chequera electrónica Banco Estado N° 38172176582<br>Nombre: Soporte Médico&amp;Dental SPA · RUT: 77.009.054-7<br>Email: equipos.medic@gmail.com<br><em style="font-size:10px;color:var(--txs)">Validez cotización: 15 días desde emisión</em></div>`;
+  const BANCO_SM=`<div class="doc-banco"><strong>Datos de pago</strong>Soporte Médico y Dental SPA · RUT: 77.009.054-7<br>Cuenta Corriente BancoEstado N° 38100425871<br>Chequera Electrónica BancoEstado N° 38172176582<br>Email: equipos.medic@gmail.com<br><em style="font-size:10px;color:var(--txs)">Validez cotización: 15 días desde emisión</em></div>`;
   const BANCO_CG=`<div class="doc-banco"><strong>Datos de pago</strong>Cuenta corriente BancoEstado N° 38100137680<br>Carlos Guzmán Palma · RUT: 10.654.075-6<br>Email: equipos.medic@gmail.com<br><em style="font-size:10px;color:var(--txs)">Validez: 15 días desde emisión</em></div>`;
 
   document.getElementById('pgPrev').innerHTML=`
@@ -850,7 +850,7 @@ function renderPreview(doc){
           <div class="firma-bloque">
             <div class="firma-tec-wrap">
               <div style="display:flex;align-items:center;justify-content:center;gap:12px">
-                <img style="max-height:72px;max-width:156px;object-fit:contain" src="${firma}" alt="Firma">
+                <img style="max-height:94px;max-width:156px;object-fit:contain" src="${firma}" alt="Firma">
                 <img style="max-height:65px;max-width:143px;object-fit:contain;opacity:.9" src="${timbre}" alt="Timbre">
               </div>
             </div>
@@ -869,7 +869,7 @@ function renderItemsDoc(doc,secCls,hdrCls){
   const m=doc.items;const isCG=doc.tipo==='cot_cg';const cls=isCG?'cg':'sm';
   const bancoDatos=isCG
     ?`Cuenta corriente BancoEstado N° 38100137680<br><strong>Carlos Guzmán Palma</strong> · RUT: 10.654.075-6<br>Email: equipos.medic@gmail.com<br><span style="font-size:10px;color:var(--txs)">Validez: 15 días desde emisión</span>`
-    :`Cuenta: Chequera electrónica BancoEstado N° 38172176582<br><strong>Soporte Médico&amp;Dental SPA</strong> · RUT: 77.009.054-7<br>Email: equipos.medic@gmail.com<br><span style="font-size:10px;color:var(--txs)">Validez: 15 días desde emisión</span>`;
+    :`<strong>Soporte Médico y Dental SPA</strong> · RUT: 77.009.054-7<br>Cuenta Corriente BancoEstado N° 38100425871<br>Chequera Electrónica BancoEstado N° 38172176582<br>Email: equipos.medic@gmail.com<br><span style="font-size:10px;color:var(--txs)">Validez: 15 días desde emisión</span>`;
 
   if(isCG){
     return`<div class="doc-sec ${secCls}">Detalle del Trabajo</div>
