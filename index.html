@@ -1190,12 +1190,10 @@ function _xlsxAppendRow(wsXml,row,rowNum){
 
 // ══ MANTENEDOR ══
 let mantTab='clientes';
-function abrirMant(){mantTab='clientes';renderMant();document.getElementById('navSub').textContent='Mantenedor';showPg('pgMant');}
-function setMantTab(t){mantTab=t;renderMant();}
-function renderMant(){
-  const busq=(document.getElementById('mBusq')?.value||'').toLowerCase();
-  const data=mantTab==='clientes'?CLIENTES:EQUIPOS;
-  const fil=busq.length>1?data.filter(d=>(mantTab==='clientes'?(d.n+(d.d||'')):d.l).toLowerCase().includes(busq)).slice(0,40):data.slice(0,30);
+function abrirMant(){mantTab='clientes';_renderMantShell();renderMantLista();document.getElementById('navSub').textContent='Mantenedor';showPg('pgMant');}
+function setMantTab(t){mantTab=t;_renderMantShell();renderMantLista();}
+function renderMant(){renderMantLista();}
+function _renderMantShell(){
   document.getElementById('pgMant').innerHTML=`
   <div class="mant-page">
     <div class="mant-tabs">
@@ -1203,15 +1201,21 @@ function renderMant(){
       <button class="mant-tab ${mantTab==='equipos'?'on':''}" onclick="setMantTab('equipos')">Equipos (${EQUIPOS.length})</button>
     </div>
     <button class="btn-add-main" onclick="modalAgregar()">+ Agregar ${mantTab==='clientes'?'Cliente':'Equipo'}</button>
-    <input class="mant-buscar" id="mBusq" placeholder="Buscar..." value="${busq}" oninput="renderMant()">
-    <div style="font-size:12px;color:var(--txs);margin-bottom:8px">${busq.length>1?fil.length+' resultado(s)':'Primeros 30 — use búsqueda para filtrar'}</div>
-    <div class="mant-lista">
-      ${fil.map(d=>{const idx=data.indexOf(d);
-        if(mantTab==='clientes')return`<div class="mant-item"><div><div class="mant-item-nombre">${d.n}${d.d?' — '+d.d:''}</div><div class="mant-item-sub">RUT: ${d.r||'—'} | ${d.t||'—'}</div></div><div style="display:flex;gap:6px"><button class="btn-edit" onclick="modalEditC(${idx})">Editar</button><button class="btn-edit" style="background:#fdecea;color:var(--ro)" onclick="eliminarC(${idx})">Eliminar</button></div></div>`;
-        return`<div class="mant-item"><div><div class="mant-item-nombre">${d.l}</div><div class="mant-item-sub">Marca: ${d.m||'—'} | Modelo: ${d.o||'—'} | Serie: ${d.s||'—'}${d.da?' | Data: '+d.da:''}${d.ba?' | Baja: '+d.ba:''}</div></div><div style="display:flex;gap:6px"><button class="btn-edit" onclick="modalEditE(${idx})">Editar</button><button class="btn-edit" style="background:#fdecea;color:var(--ro)" onclick="eliminarE(${idx})">Eliminar</button></div></div>`;
-      }).join('')}
-    </div>
+    <input class="mant-buscar" id="mBusq" placeholder="Buscar..." oninput="renderMantLista()">
+    <div id="mantInfo" style="font-size:12px;color:var(--txs);margin-bottom:8px"></div>
+    <div class="mant-lista" id="mantLista"></div>
   </div>`;}
+function renderMantLista(){
+  const busq=(document.getElementById('mBusq')?.value||'').toLowerCase();
+  const data=mantTab==='clientes'?CLIENTES:EQUIPOS;
+  const fil=busq.length>1?data.filter(d=>(mantTab==='clientes'?(d.n+(d.d||'')):d.l).toLowerCase().includes(busq)).slice(0,40):data.slice(0,30);
+  const info=document.getElementById('mantInfo');
+  const lista=document.getElementById('mantLista');
+  if(info)info.textContent=busq.length>1?fil.length+' resultado(s)':'Primeros 30 — use búsqueda para filtrar';
+  if(lista)lista.innerHTML=fil.map(d=>{const idx=data.indexOf(d);
+    if(mantTab==='clientes')return`<div class="mant-item"><div><div class="mant-item-nombre">${d.n}${d.d?' — '+d.d:''}</div><div class="mant-item-sub">RUT: ${d.r||'—'} | ${d.t||'—'}</div></div><div style="display:flex;gap:6px"><button class="btn-edit" onclick="modalEditC(${idx})">Editar</button><button class="btn-edit" style="background:#fdecea;color:var(--ro)" onclick="eliminarC(${idx})">Eliminar</button></div></div>`;
+    return`<div class="mant-item"><div><div class="mant-item-nombre">${d.l}</div><div class="mant-item-sub">Marca: ${d.m||'—'} | Modelo: ${d.o||'—'} | Serie: ${d.s||'—'}${d.da?' | Data: '+d.da:''}${d.ba?' | Baja: '+d.ba:''}</div></div><div style="display:flex;gap:6px"><button class="btn-edit" onclick="modalEditE(${idx})">Editar</button><button class="btn-edit" style="background:#fdecea;color:var(--ro)" onclick="eliminarE(${idx})">Eliminar</button></div></div>`;
+  }).join('');}
 
 function modalAgregar(){
   if(mantTab==='clientes'){
