@@ -1088,7 +1088,8 @@ const EXCEL_PATH='/Soporte Medico/Registro historico informes, cotizaciones y ma
 async function _xlsxNextCorr(zip,tipo){
   try{
     if(!zip)return null;
-    const sheetMap={cot_sm:'BD_cotización',inf_sm:'BD_informe',cot_cg:'BD_cotización_CG',inf_cg:'BD_informe_CG'};
+    const sheetMap={cot_sm:'BD_cotización',inf_sm:'BD_informe',cot_cg:'BD_cotización_CG',inf_cg:'BD_informe_CG',
+      mant_sillon:'BD_mant',mant_bomba:'BD_mant',mant_concentrador:'BD_mant'};
     const sheetName=sheetMap[tipo];
     if(!sheetName)return null;
     const wbXml=await zip.file('xl/workbook.xml').async('text');
@@ -1175,7 +1176,7 @@ async function guardarEnExcel(doc,num,preloadedZip){
       sheetName='BD_mant';
       const tipoInf=(NOMBRES[tipo]||tipo).replace(/\n/g,' ');
       const estadoMant=doc.checklist?.resumen?.map(r=>r.item+(r.estado?' ('+r.estado+')':'')).join(', ')||'';
-      newRow=[fmtF(doc.fecha_doc),empresa,tipoInf,cli.n,cli.r,cli.a,cli.t,cli.e,
+      newRow=[num,fmtF(doc.fecha_doc),empresa,tipoInf,cli.n,cli.r,cli.a,cli.t,cli.e,
         equ.l,equ.m,equ.o,equ.s,doc.frecuencia||'',estadoMant];
     }
     if(!sheetName)return;
