@@ -986,12 +986,29 @@ async function guardar(){
   }
 
   const doc=currentDoc;
-  const num=nextCorr(doc.tipo);
-  doc.numero=num;
-  const nd=document.getElementById('docNumDisp');if(nd)nd.textContent=`N° ${num}`;
-
   const btn=document.getElementById('btnG');
   if(btn){btn.disabled=true;btn.textContent='Guardando...';}
+
+  // Descargar Excel una vez para leer correlativo real y luego reutilizarlo al guardar
+  showProg('Leyendo correlativo...','Consultando base de datos en Dropbox');
+  let _xlsxZip=null;
+  try{
+    const dlR=await fetch(PROXY,{method:'POST',
+      headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':dbxArg({path:EXCEL_PATH}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}});
+    if(dlR.ok){
+      const buf=await dlR.arrayBuffer();
+      _xlsxZip=await window.JSZip.loadAsync(buf);
+    }
+  }catch{}
+
+  // Obtener siguiente correlativo desde Excel (fuente de verdad única)
+  let num=await _xlsxNextCorr(_xlsxZip,doc.tipo);
+  // Fallback a corrCache si no se pudo leer Excel
+  if(!num){num=nextCorr(doc.tipo);}
+  else{if(corrCache)corrCache[doc.tipo]=parseInt(num.replace(/\D/g,''))+1;}
+
+  doc.numero=num;
+  const nd=document.getElementById('docNumDisp');if(nd)nd.textContent=`N° ${num}`;
 
   addBD(getBDKey(doc.tipo),{...doc,firma:firmaData?'si':'no',firmante:nomFirmante,ts:new Date().toISOString()});
   showProg('Generando PDF...','Puede tomar 15-20 segundos');
@@ -1034,9 +1051,9 @@ async function guardar(){
 
     if(resp.ok){
       await saveCorr();
-      // Guardar en Excel BD
+      // Guardar en Excel BD (pasar ZIP ya descargado para no bajar dos veces)
       showProg('Actualizando base de datos...','Registrando en el Excel de Dropbox');
-      await guardarEnExcel(doc,num);
+      await guardarEnExcel(doc,num,_xlsxZip);
       hideProg();
       toast(`✓ ${lblArch} N°${num} guardado`,'ok');
       document.querySelector('.doc-num-label').textContent=`${lblArch} N° ${num} — Guardado ✓`;
@@ -1067,17 +1084,48 @@ async function guardar(){
 // ══ GUARDAR EN EXCEL BD (Dropbox) ══
 const EXCEL_PATH='/Soporte Medico/Registro historico informes, cotizaciones y mantencion.xlsm';
 
-async function guardarEnExcel(doc,num){
+async function _xlsxNextCorr(zip,tipo){
+  try{
+    if(!zip)return null;
+    const sheetMap={cot_sm:'BD_cotización',inf_sm:'BD_informe',cot_cg:'BD_cotización_CG',inf_cg:'BD_informe_CG'};
+    const sheetName=sheetMap[tipo];
+    if(!sheetName)return null; // mant types: no sequential number in Excel
+    const wbXml=await zip.file('xl/workbook.xml').async('text');
+    const wsPath=await _xlsxResolveSheet(zip,wbXml,sheetName);
+    if(!wsPath)return null;
+    const wsXml=await zip.file(wsPath).async('text');
+    const lastRow=_xlsxLastRow(wsXml);
+    if(lastRow<=1)return String(1).padStart(5,'0');
+    // Read cell A of last data row
+    const rowRx=new RegExp(`<row r="${lastRow}"[^>]*>([\\s\\S]*?)<\\/row>`);
+    const rowM=wsXml.match(rowRx);
+    if(!rowM)return String(lastRow-1+1).padStart(5,'0');
+    const cellM=rowM[1].match(/<c r="A\d+"([^>]*)>([\s\S]*?)<\/c>/);
+    if(!cellM)return String(lastRow).padStart(5,'0');
+    // Extract value (number or inlineStr; skip shared string t="s")
+    let val=null;
+    if(cellM[1].includes('inlineStr')){const m=cellM[2].match(/<t>([^<]*)<\/t>/);val=m?m[1]:null;}
+    else if(!cellM[1].includes('"s"')){const m=cellM[2].match(/<v>([^<]*)<\/v>/);val=m?m[1]:null;}
+    const lastNum=val?parseInt(val.replace(/\D/g,'')):NaN;
+    const next=isNaN(lastNum)?lastRow:lastNum+1;
+    return String(next).padStart(5,'0');
+  }catch(e){console.warn('_xlsxNextCorr:',e.message);return null;}
+}
+
+async function guardarEnExcel(doc,num,preloadedZip){
   const tok=await ensureFreshToken();if(!tok)return;
   try{
-    const dlResp=await fetch(PROXY,{method:'POST',
-      headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':dbxArg({path:EXCEL_PATH}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}
-    });
-    if(!dlResp.ok){console.warn('No se pudo descargar el Excel BD');return;}
-    const xlsxBuf=await dlResp.arrayBuffer();
-
     const JSZip=window.JSZip;
     if(!JSZip){console.warn('JSZip no disponible');return;}
+
+    let zip=preloadedZip||null;
+    if(!zip){
+      const dlResp=await fetch(PROXY,{method:'POST',
+        headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':dbxArg({path:EXCEL_PATH}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}
+      });
+      if(!dlResp.ok){console.warn('No se pudo descargar el Excel BD');return;}
+      zip=await JSZip.loadAsync(await dlResp.arrayBuffer());
+    }
 
     const tipo=doc.tipo;const cli=doc.cliente;const equ=doc.equipo;
     const empresa=esCG(tipo)||tecnicoEsCG(doc.tec)?'Carlos Guzmán Palma':'Soporte Médico';
