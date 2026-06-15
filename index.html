@@ -121,7 +121,7 @@ button{cursor:pointer;font-family:inherit}
 .doc-items.sm tr.tot-row td{color:var(--az);border-color:var(--az)}
 .doc-items.cg tr.tot-row td{color:var(--tl);border-color:var(--tl)}
 /* Sección banco + totales (como PDF referencia) */
-.doc-totales-wrap{break-inside:avoid;page-break-inside:avoid}display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:8px;border:1px solid var(--grb);border-radius:6px;overflow:hidden}
+.doc-totales-wrap{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:8px;border:1px solid var(--grb);border-radius:6px;overflow:hidden;break-inside:avoid;page-break-inside:avoid}
 .doc-banco{padding:10px 12px;font-size:11px;line-height:1.7;color:var(--tx);background:#f9fafb;break-inside:avoid;page-break-inside:avoid}
 .doc-banco strong{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--txs);margin-bottom:4px}
 .doc-montos{display:flex;flex-direction:column;border-left:1px solid var(--grb)}
@@ -1089,21 +1089,38 @@ async function _xlsxNextCorr(zip,tipo){
     if(!zip)return null;
     const sheetMap={cot_sm:'BD_cotización',inf_sm:'BD_informe',cot_cg:'BD_cotización_CG',inf_cg:'BD_informe_CG'};
     const sheetName=sheetMap[tipo];
-    if(!sheetName)return null; // mant types: no sequential number in Excel
+    if(!sheetName)return null;
     const wbXml=await zip.file('xl/workbook.xml').async('text');
     const wsPath=await _xlsxResolveSheet(zip,wbXml,sheetName);
     if(!wsPath)return null;
     const wsXml=await zip.file(wsPath).async('text');
-    // Scan ALL rows, find last one with a non-empty value in column A
+    // Load shared strings table for t="s" cells
+    let ss=[];
+    const ssFile=zip.file('xl/sharedStrings.xml');
+    if(ssFile){
+      const ssXml=await ssFile.async('text');
+      const siRx=/<si>([\s\S]*?)<\/si>/g;let sm;
+      while((sm=siRx.exec(ssXml))!==null){
+        const t=sm[1].match(/<t[^>]*>([^<]*)<\/t>/g)||[];
+        ss.push(t.map(x=>x.replace(/<[^>]+>/g,'')).join(''));
+      }
+    }
+    // Scan ALL rows, find last non-empty value in column A
     const rowRx=/<row r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g;
-    let lastNum=NaN;
-    let m;
+    let lastNum=NaN;let m;
     while((m=rowRx.exec(wsXml))!==null){
       const cellM=m[2].match(/<c r="A\d+"([^>]*)>([\s\S]*?)<\/c>/);
       if(!cellM)continue;
       let val=null;
-      if(cellM[1].includes('inlineStr')){const t=cellM[2].match(/<t>([^<]*)<\/t>/);val=t?t[1]:null;}
-      else if(!cellM[1].includes('"s"')){const t=cellM[2].match(/<v>([^<]*)<\/v>/);val=t?t[1]:null;}
+      const attr=cellM[1];const inner=cellM[2];
+      if(attr.includes('t="s"')||attr.includes("t='s'")){
+        const idx=inner.match(/<v>(\d+)<\/v>/);
+        if(idx)val=ss[parseInt(idx[1])]||null;
+      }else if(attr.includes('inlineStr')){
+        const t=inner.match(/<t[^>]*>([^<]*)<\/t>/);val=t?t[1]:null;
+      }else{
+        const t=inner.match(/<v>([^<]*)<\/v>/);val=t?t[1]:null;
+      }
       if(val&&val.trim()){const n=parseInt(val.replace(/\D/g,''));if(!isNaN(n))lastNum=n;}
     }
     if(isNaN(lastNum))return String(1).padStart(5,'0');
