@@ -1120,9 +1120,8 @@ async function _xlsxNextCorr(zip,tipo){
         if(idx)val=ss[parseInt(idx[1])]||null;
       }else if(attr.includes('inlineStr')){
         const t=inner.match(/<t[^>]*>([^<]*)<\/t>/);val=t?t[1]:null;
-      }else{
-        const t=inner.match(/<v>([^<]*)<\/v>/);val=t?t[1]:null;
       }
+      // Skip bare numeric cells (could be date serials stored as numbers)
       if(val&&val.trim()){const n=parseInt(val.replace(/\D/g,''));if(!isNaN(n))lastNum=n;}
     }
     if(isNaN(lastNum))return String(1).padStart(5,'0');
