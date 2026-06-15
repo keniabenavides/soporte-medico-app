@@ -769,7 +769,7 @@ function renderPreview(doc){
   const lbl=LABEL_A[tipo];
 
   const metaTitCls='doc-meta-tit '+hdrCls;
-  const BANCO_SM=`<div class="doc-banco"><strong>Datos de pago</strong>Soporte Médico y Dental SPA · RUT: 77.009.054-7<br>Cuenta Corriente BancoEstado N° 38100425871<br>Chequera Electrónica BancoEstado N° 38172176582<br>Email: equipos.medic@gmail.com<br><em style="font-size:10px;color:var(--txs)">Validez cotización: 15 días desde emisión</em></div>`;
+  const BANCO_SM=`<div class="doc-banco"><strong>Datos de pago</strong>Soporte Médico y Dental SPA · RUT: 77.009.054-7<br>Cta. Corriente BancoEstado N° 38100425871<br>Chequera Electrónica BancoEstado N° 38172176582<br>Email: equipos.medic@gmail.com<br><em style="font-size:10px;color:var(--txs)">Validez cotización: 15 días desde emisión</em></div>`;
   const BANCO_CG=`<div class="doc-banco"><strong>Datos de pago</strong>Cuenta corriente BancoEstado N° 38100137680<br>Carlos Guzmán Palma · RUT: 10.654.075-6<br>Email: equipos.medic@gmail.com<br><em style="font-size:10px;color:var(--txs)">Validez: 15 días desde emisión</em></div>`;
 
   document.getElementById('pgPrev').innerHTML=`
@@ -869,7 +869,7 @@ function renderItemsDoc(doc,secCls,hdrCls){
   const m=doc.items;const isCG=doc.tipo==='cot_cg';const cls=isCG?'cg':'sm';
   const bancoDatos=isCG
     ?`Cuenta corriente BancoEstado N° 38100137680<br><strong>Carlos Guzmán Palma</strong> · RUT: 10.654.075-6<br>Email: equipos.medic@gmail.com<br><span style="font-size:10px;color:var(--txs)">Validez: 15 días desde emisión</span>`
-    :`<strong>Soporte Médico y Dental SPA</strong> · RUT: 77.009.054-7<br>Cuenta Corriente BancoEstado N° 38100425871<br>Chequera Electrónica BancoEstado N° 38172176582<br>Email: equipos.medic@gmail.com<br><span style="font-size:10px;color:var(--txs)">Validez: 15 días desde emisión</span>`;
+    :`Soporte Médico y Dental SPA · RUT: 77.009.054-7<br>Cta. Corriente BancoEstado N° 38100425871<br>Chequera Electrónica BancoEstado N° 38172176582<br>Email: equipos.medic@gmail.com<br><span style="font-size:10px;color:var(--txs)">Validez: 15 días desde emisión</span>`;
 
   if(isCG){
     return`<div class="doc-sec ${secCls}">Detalle del Trabajo</div>
@@ -1094,21 +1094,20 @@ async function _xlsxNextCorr(zip,tipo){
     const wsPath=await _xlsxResolveSheet(zip,wbXml,sheetName);
     if(!wsPath)return null;
     const wsXml=await zip.file(wsPath).async('text');
-    const lastRow=_xlsxLastRow(wsXml);
-    if(lastRow<=1)return String(1).padStart(5,'0');
-    // Read cell A of last data row
-    const rowRx=new RegExp(`<row r="${lastRow}"[^>]*>([\\s\\S]*?)<\\/row>`);
-    const rowM=wsXml.match(rowRx);
-    if(!rowM)return String(lastRow-1+1).padStart(5,'0');
-    const cellM=rowM[1].match(/<c r="A\d+"([^>]*)>([\s\S]*?)<\/c>/);
-    if(!cellM)return String(lastRow).padStart(5,'0');
-    // Extract value (number or inlineStr; skip shared string t="s")
-    let val=null;
-    if(cellM[1].includes('inlineStr')){const m=cellM[2].match(/<t>([^<]*)<\/t>/);val=m?m[1]:null;}
-    else if(!cellM[1].includes('"s"')){const m=cellM[2].match(/<v>([^<]*)<\/v>/);val=m?m[1]:null;}
-    const lastNum=val?parseInt(val.replace(/\D/g,'')):NaN;
-    const next=isNaN(lastNum)?lastRow:lastNum+1;
-    return String(next).padStart(5,'0');
+    // Scan ALL rows, find last one with a non-empty value in column A
+    const rowRx=/<row r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g;
+    let lastNum=NaN;
+    let m;
+    while((m=rowRx.exec(wsXml))!==null){
+      const cellM=m[2].match(/<c r="A\d+"([^>]*)>([\s\S]*?)<\/c>/);
+      if(!cellM)continue;
+      let val=null;
+      if(cellM[1].includes('inlineStr')){const t=cellM[2].match(/<t>([^<]*)<\/t>/);val=t?t[1]:null;}
+      else if(!cellM[1].includes('"s"')){const t=cellM[2].match(/<v>([^<]*)<\/v>/);val=t?t[1]:null;}
+      if(val&&val.trim()){const n=parseInt(val.replace(/\D/g,''));if(!isNaN(n))lastNum=n;}
+    }
+    if(isNaN(lastNum))return String(1).padStart(5,'0');
+    return String(lastNum+1).padStart(5,'0');
   }catch(e){console.warn('_xlsxNextCorr:',e.message);return null;}
 }
 
