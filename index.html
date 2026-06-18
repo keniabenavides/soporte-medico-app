@@ -262,7 +262,8 @@ function nextCorr(k){
 function getBDKey(t){return{cot_sm:'cot_sm',inf_sm:'inf_sm',cot_cg:'cot_cg',inf_cg:'inf_cg',mant_sillon:'mant',mant_bomba:'mant',mant_concentrador:'mant'}[t]||t;}
 function addBD(k,r){try{const b=JSON.parse(localStorage.getItem('bd_'+k)||'[]');b.push(r);localStorage.setItem('bd_'+k,JSON.stringify(b));}catch{}}
 function getToken(){return localStorage.getItem('dbx_token')||'';}
-function getDbxAppKey(){return localStorage.getItem('dbx_app_key')||'';}
+const DBX_APP_KEY='0dcfq8tmquthi0s';
+function getDbxAppKey(){return DBX_APP_KEY;}
 function dbxArg(obj){return JSON.stringify(obj).replace(/[^\x00-\x7F]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));}
 
 // ══ OAUTH2 PKCE + REFRESH TOKEN ══
@@ -1371,34 +1372,27 @@ function eliminarE(idx){
 // ══ DROPBOX CONFIG ══
 function modalDropbox(){
   const hasRefresh=!!localStorage.getItem('dbx_refresh_token');
-  const appKey=getDbxAppKey();
   const tok=getToken();
   const statusHtml=hasRefresh
-    ?`<div style="background:#e8f5ee;border-radius:8px;padding:10px 12px;font-size:13px;color:var(--ve);margin-bottom:12px">✅ Conectado con token permanente (auto-renovación activa)</div>`
-    :`<div style="background:#fff8e6;border-radius:8px;padding:10px 12px;font-size:13px;color:#7a5a00;margin-bottom:12px">⚠️ Sin token permanente — el token expira cada pocas horas</div>`;
+    ?`<div style="background:#e8f5ee;border-radius:8px;padding:10px 12px;font-size:13px;color:var(--ve);margin-bottom:12px">✅ Conectado — token se renueva automáticamente</div>`
+    :`<div style="background:#fff8e6;border-radius:8px;padding:10px 12px;font-size:13px;color:#7a5a00;margin-bottom:12px">⚠️ No conectado en este dispositivo — haz clic en "Conectar con Dropbox"</div>`;
   openModal(`<h3>Configurar Dropbox</h3>
     ${statusHtml}
-    <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:var(--az)">🔑 Conexión permanente (recomendado)</div>
-    <div class="config-card" style="margin-bottom:10px">
-      1. Ve a <a href="https://www.dropbox.com/developers/apps" target="_blank">dropbox.com/developers/apps</a> → tu app<br>
-      2. Pestaña <strong>Settings</strong> → copia el <strong>App key</strong><br>
-      3. Pégalo abajo y pulsa "Conectar con Dropbox"<br>
-      4. Autoriza en la página de Dropbox — vuelves automáticamente<br>
-      <em style="font-size:11px;color:var(--txs)">El token se renovará solo, nunca expirará.</em>
+    <div style="font-size:13px;color:var(--txs);margin-bottom:14px;line-height:1.6">
+      Solo necesitas hacer esto <strong>una vez por dispositivo</strong>.<br>
+      Haz clic en el botón, autoriza en Dropbox y listo — el sistema guardará automáticamente para siempre.
     </div>
-    <div class="campo"><label>App Key</label><input type="text" id="mAppKey" value="${appKey}" placeholder="xxxxxxxxxxxxxxx"></div>
-    <button class="btn-pri" style="width:100%;margin-top:4px" onclick="saveAppKeyAndOAuth()">🔗 Conectar con Dropbox</button>
-    <div style="text-align:center;font-size:12px;color:var(--txs);margin:14px 0 6px">— o usa token manual (expira cada pocas horas) —</div>
-    <div class="campo"><label>Access Token manual</label><input type="password" id="mTok" value="${tok}" placeholder="sl.xxxxxxxxx..."></div>
-    <button type="button" style="width:100%;background:none;border:1.5px solid var(--azc);border-radius:10px;padding:12px;font-size:14px;color:var(--azc)" onclick="saveTok()">Guardar token manual</button>
-    <button type="button" style="width:100%;margin-top:8px;background:none;border:1.5px solid var(--grb);border-radius:10px;padding:10px;font-size:13px;color:var(--txs)" onclick="testDropbox()">🔍 Probar conexión</button>
-    <div id="dbxTestResult" style="margin-top:8px;font-size:13px;display:none"></div>
-    <button class="btn-cancel" onclick="closeModal()">Cancelar</button>`);
+    <button class="btn-pri" style="width:100%;margin-bottom:14px" onclick="saveAppKeyAndOAuth()">🔗 Conectar con Dropbox</button>
+    <details style="font-size:12px;color:var(--txs)">
+      <summary style="cursor:pointer;margin-bottom:8px">Opción avanzada: token manual (expira cada pocas horas)</summary>
+      <div class="campo" style="margin-top:8px"><label>Access Token manual</label><input type="password" id="mTok" value="${tok}" placeholder="sl.xxxxxxxxx..."></div>
+      <button type="button" style="width:100%;background:none;border:1.5px solid var(--azc);border-radius:10px;padding:10px;font-size:13px;color:var(--azc);margin-bottom:6px" onclick="saveTok()">Guardar token manual</button>
+      <button type="button" style="width:100%;background:none;border:1.5px solid var(--grb);border-radius:10px;padding:8px;font-size:12px;color:var(--txs)" onclick="testDropbox()">🔍 Probar conexión</button>
+      <div id="dbxTestResult" style="margin-top:8px;font-size:13px;display:none"></div>
+    </details>
+    <button class="btn-cancel" style="margin-top:12px" onclick="closeModal()">Cancelar</button>`);
 }
 function saveAppKeyAndOAuth(){
-  const k=document.getElementById('mAppKey')?.value.trim();
-  if(!k){toast('Ingresa el App Key','err');return;}
-  localStorage.setItem('dbx_app_key',k);
   closeModal();
   iniciarOAuth();
 }
