@@ -1357,8 +1357,29 @@ function persist(){
 async function loadCliEqu(){
   const tok=await ensureFreshToken();if(!tok)return;
   const dl=(path)=>fetch(PROXY,{method:'POST',headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':dbxArg({path}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}});
-  try{const r=await dl(CLI_PATH);if(r.ok){const d=await r.json();if(Array.isArray(d)&&d.length)CLIENTES=d;}}catch{}
-  try{const r=await dl(EQU_PATH);if(r.ok){const d=await r.json();if(Array.isArray(d)&&d.length)EQUIPOS=d;}}catch{}
+  try{
+    const r=await dl(CLI_PATH);
+    if(r.ok){
+      const d=await r.json();
+      if(Array.isArray(d)&&d.length){
+        // Merge: hardcoded list as base, Dropbox additions on top (by name)
+        const map=new Map(CLIENTES.map(c=>[c.n,c]));
+        d.forEach(c=>{if(c.n)map.set(c.n,c);});
+        CLIENTES=[...map.values()];
+      }
+    }
+  }catch{}
+  try{
+    const r=await dl(EQU_PATH);
+    if(r.ok){
+      const d=await r.json();
+      if(Array.isArray(d)&&d.length){
+        const map=new Map(EQUIPOS.map(e=>[e.l,e]));
+        d.forEach(e=>{if(e.l)map.set(e.l,e);});
+        EQUIPOS=[...map.values()];
+      }
+    }
+  }catch{}
 }
 function eliminarC(idx){
   if(!confirm(`¿Eliminar cliente "${CLIENTES[idx]?.n}"?`))return;
