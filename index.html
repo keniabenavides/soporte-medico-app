@@ -687,7 +687,7 @@ function acCli(q){
   const list=document.getElementById('acCliList');
   if(!q||q.length<2){list.style.display='none';return;}
   const ql=q.toLowerCase();
-  const m=CLIENTES.filter(c=>(c.n+(c.d||'')).toLowerCase().includes(ql)).slice(0,10);
+  const m=CLIENTES.filter(c=>(c.n+(c.d||'')).toLowerCase().includes(ql)).slice(0,50);
   if(!m.length){list.style.display='none';return;}
   list.innerHTML=m.map(c=>`<div class="ac-item" onmousedown="pickCli(${CLIENTES.indexOf(c)})">${c.n}${c.d?' — '+c.d:''}</div>`).join('');
   list.style.display='block';
@@ -704,7 +704,7 @@ function acEqu(q){
   const list=document.getElementById('acEquList');
   if(!q||q.length<2){list.style.display='none';return;}
   const ql=q.toLowerCase();
-  const m=EQUIPOS.filter(e=>e.l.toLowerCase().includes(ql)).slice(0,12);
+  const m=EQUIPOS.filter(e=>e.l.toLowerCase().includes(ql)).slice(0,50);
   if(!m.length){list.style.display='none';return;}
   list.innerHTML=m.map(e=>`<div class="ac-item" onmousedown="pickEqu(${EQUIPOS.indexOf(e)})">${e.l}</div>`).join('');
   list.style.display='block';
@@ -1357,29 +1357,8 @@ function persist(){
 async function loadCliEqu(){
   const tok=await ensureFreshToken();if(!tok)return;
   const dl=(path)=>fetch(PROXY,{method:'POST',headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':dbxArg({path}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}});
-  try{
-    const r=await dl(CLI_PATH);
-    if(r.ok){
-      const d=await r.json();
-      if(Array.isArray(d)&&d.length){
-        // Merge: hardcoded list as base, Dropbox additions on top (by name)
-        const map=new Map(CLIENTES.map(c=>[c.n,c]));
-        d.forEach(c=>{if(c.n)map.set(c.n,c);});
-        CLIENTES=[...map.values()];
-      }
-    }
-  }catch{}
-  try{
-    const r=await dl(EQU_PATH);
-    if(r.ok){
-      const d=await r.json();
-      if(Array.isArray(d)&&d.length){
-        const map=new Map(EQUIPOS.map(e=>[e.l,e]));
-        d.forEach(e=>{if(e.l)map.set(e.l,e);});
-        EQUIPOS=[...map.values()];
-      }
-    }
-  }catch{}
+  try{const r=await dl(CLI_PATH);if(r.ok){const d=await r.json();if(Array.isArray(d)&&d.length)CLIENTES=d;}}catch{}
+  try{const r=await dl(EQU_PATH);if(r.ok){const d=await r.json();if(Array.isArray(d)&&d.length)EQUIPOS=d;}}catch{}
 }
 function eliminarC(idx){
   if(!confirm(`¿Eliminar cliente "${CLIENTES[idx]?.n}"?`))return;
