@@ -136,6 +136,7 @@ button{cursor:pointer;font-family:inherit}
 /* Checklist doc */
 .chk-doc-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:10px}
 .chk-doc-row{display:flex;align-items:flex-start;gap:5px;padding:4px 8px;border-radius:3px;font-size:11px;line-height:1.4;border:1px solid transparent;break-inside:avoid;page-break-inside:avoid}
+.chk-sec-bloque{break-inside:avoid;page-break-inside:avoid}
 .chk-doc-row.ok{background:#e8f5ee;border-color:#c3e6cb}
 .chk-doc-row.no{background:#f4f6f8;border-color:var(--grb);color:var(--txs)}
 /* Tabla resumen mantención */
@@ -912,22 +913,22 @@ function renderChecklistDoc(cl,secCls,tipo,tec){
   const thBg=isCG?'var(--tl)':'var(--az)';
   const resTblCls=isCG?'cg':'';
 
-  // Sección 1
-  let html=`<div class="doc-sec ${secCls}">${cl.sec1[0]?.sec||'Revisión y ajustes realizados'}</div>
+  // Sección 1 — título anclado a su grid con break-after:avoid
+  let html=`<div style="break-inside:avoid;page-break-inside:avoid"><div class="doc-sec ${secCls}" style="break-after:avoid;page-break-after:avoid">${cl.sec1[0]?.sec||'Revisión y ajustes realizados'}</div>
   <div class="chk-doc-grid">
     ${cl.sec1.map(c=>`<div class="chk-doc-row ${c.ok?'ok':'no'}">${c.ok?'☑':'☐'} ${c.item}</div>`).join('')}
-  </div>`;
+  </div></div>`;
 
   // Sección 2 (solo si existe)
   if(cl.sec2&&cl.sec2.length>0){
-    html+=`<div class="doc-sec ${secCls}">${cl.sec2[0]?.sec||'Examen e inspección'}</div>
+    html+=`<div style="break-inside:avoid;page-break-inside:avoid"><div class="doc-sec ${secCls}" style="break-after:avoid;page-break-after:avoid">${cl.sec2[0]?.sec||'Examen e inspección'}</div>
     <div class="chk-doc-grid">
       ${cl.sec2.map(c=>`<div class="chk-doc-row ${c.ok?'ok':'no'}">${c.ok?'☑':'☐'} ${c.item}</div>`).join('')}
-    </div>`;
+    </div></div>`;
   }
 
-  // Resumen
-  html+=`<div class="doc-sec ${secCls}">Resumen</div>
+  // Resumen — thead anclado a primeras filas para no quedarse solo
+  html+=`<div style="break-inside:avoid;page-break-inside:avoid"><div class="doc-sec ${secCls}" style="break-after:avoid;page-break-after:avoid">Resumen</div>
   <table class="resumen-tabla ${resTblCls}" style="--th-bg:${thBg}">
     <thead><tr>
       <th style="background:${thBg};text-align:center">Estado</th>
@@ -943,7 +944,7 @@ function renderChecklistDoc(cl,secCls,tipo,tec){
         <td>${r.modelo||'—'}</td>
       </tr>`).join('')}
     </tbody>
-  </table>`;
+  </table></div>`;
   return html;
 }
 
