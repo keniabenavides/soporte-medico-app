@@ -913,18 +913,25 @@ function renderChecklistDoc(cl,secCls,tipo,tec){
   const thBg=isCG?'var(--tl)':'var(--az)';
   const resTblCls=isCG?'cg':'';
 
-  // Sección 1 — título anclado a su grid con break-after:avoid
-  let html=`<div style="break-inside:avoid;page-break-inside:avoid"><div class="doc-sec ${secCls}" style="break-after:avoid;page-break-after:avoid">${cl.sec1[0]?.sec||'Revisión y ajustes realizados'}</div>
-  <div class="chk-doc-grid">
-    ${cl.sec1.map(c=>`<div class="chk-doc-row ${c.ok?'ok':'no'}">${c.ok?'☑':'☐'} ${c.item}</div>`).join('')}
-  </div></div>`;
+  const chkTable=(items,titulo)=>{
+    const rows=[];
+    for(let i=0;i<items.length;i+=2){
+      const a=items[i],b=items[i+1];
+      rows.push(`<tr style="break-inside:avoid;page-break-inside:avoid">
+        <td class="chk-doc-row ${a.ok?'ok':'no'}" style="width:50%">${a.ok?'☑':'☐'} ${a.item}</td>
+        <td class="chk-doc-row ${b?b.ok?'ok':'no':''}" style="width:50%">${b?(b.ok?'☑':'☐')+' '+b.item:''}</td>
+      </tr>`);
+    }
+    return `<div class="doc-sec ${secCls}" style="break-after:avoid;page-break-after:avoid">${titulo}</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:10px"><tbody>${rows.join('')}</tbody></table>`;
+  };
+
+  // Sección 1
+  let html=chkTable(cl.sec1,cl.sec1[0]?.sec||'Revisión y ajustes realizados');
 
   // Sección 2 (solo si existe)
   if(cl.sec2&&cl.sec2.length>0){
-    html+=`<div style="break-inside:avoid;page-break-inside:avoid"><div class="doc-sec ${secCls}" style="break-after:avoid;page-break-after:avoid">${cl.sec2[0]?.sec||'Examen e inspección'}</div>
-    <div class="chk-doc-grid">
-      ${cl.sec2.map(c=>`<div class="chk-doc-row ${c.ok?'ok':'no'}">${c.ok?'☑':'☐'} ${c.item}</div>`).join('')}
-    </div></div>`;
+    html+=chkTable(cl.sec2,cl.sec2[0]?.sec||'Examen e inspección');
   }
 
   // Resumen — thead anclado a primeras filas para no quedarse solo
