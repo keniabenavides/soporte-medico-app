@@ -1121,7 +1121,7 @@ async function guardarEnExcel(doc,num){
     const XLSX=window.XLSX;
     if(!XLSX){console.warn('SheetJS no disponible');return;}
 
-    const wb=XLSX.read(new Uint8Array(xlsxBuf),{type:'array',cellDates:true});
+    const wb=XLSX.read(new Uint8Array(xlsxBuf),{type:'array',cellDates:true,bookVBA:true});
     const tipo=doc.tipo;
     const cli=doc.cliente;
     const equ=doc.equipo;
@@ -1133,31 +1133,31 @@ async function guardarEnExcel(doc,num){
       sheetName='BD_cotización';
       const m=doc.items||{};
       const detalles=m.items?m.items.map(i=>i.desc).join(' / '):'';
-      newRow=[null,num,doc.fecha_doc,cli.n+(cli.d?' - '+cli.d:''),cli.n,cli.r,cli.a,cli.t,cli.e,
-        fechasServStr,equ.l,equ.l,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,
+      newRow=[num,fmtF(doc.fecha_doc),cli.n,cli.r,cli.a,cli.t,cli.e,
+        fechasServStr,equ.t,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,
         m.subtotal||0,m.iva||0,m.total||0,m.tipo_pago||'',doc.fecha_doc?doc.fecha_doc.substring(0,4):''];
     } else if(tipo==='inf_sm'){
       sheetName='BD_informe';
       const detalles=(doc.procs||[]).join(' / ');
-      newRow=[null,num,doc.fecha_doc,cli.n+(cli.d?' - '+cli.d:''),cli.n,cli.r,cli.a,cli.t,cli.e,
-        fechasServStr,equ.l,equ.l,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,doc.resultado||''];
+      newRow=[num,fmtF(doc.fecha_doc),cli.n,cli.r,cli.a,cli.t,cli.e,
+        fechasServStr,equ.t,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,doc.resultado||''];
     } else if(tipo==='cot_cg'){
       sheetName='BD_cotización_CG';
       const m=doc.items||{};
       const detalles=m.items?m.items.map(i=>i.desc).join(' / '):'';
-      newRow=[null,num,doc.fecha_doc,cli.n+(cli.d?' - '+cli.d:''),cli.n,cli.r,cli.a,cli.t,cli.e,
-        fechasServStr,equ.l,equ.l,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,
+      newRow=[num,fmtF(doc.fecha_doc),cli.n,cli.r,cli.a,cli.t,cli.e,
+        fechasServStr,equ.t,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,
         m.honorario||0,m.retencion||0,m.total||0,doc.fecha_doc?doc.fecha_doc.substring(0,4):'',m.pct||14.5,m.tipo_pago||''];
     } else if(tipo==='inf_cg'){
       sheetName='BD_informe_CG';
       const detalles=(doc.procs||[]).join(' / ');
-      newRow=[null,num,doc.fecha_doc,cli.n+(cli.d?' - '+cli.d:''),cli.n,cli.r,cli.a,cli.t,cli.e,
-        fechasServStr,equ.l,equ.l,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,doc.resultado||''];
+      newRow=[num,fmtF(doc.fecha_doc),cli.n,cli.r,cli.a,cli.t,cli.e,
+        fechasServStr,equ.t,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,doc.resultado||''];
     } else if(esMant(tipo)){
       sheetName='BD_mant';
-      const tipoInf=NOMBRES[tipo].replace('\\n',' ');
+      const tipoInf=NOMBRES[tipo].replace('\n',' ');
       const estadoMant=doc.checklist?.resumen?.map(r=>r.item+(r.estado?' ('+r.estado+')':'')).join(', ')||'';
-      newRow=[num,doc.fecha_doc,empresa,tipoInf,cli.n,cli.r,cli.a,cli.t,cli.e,
+      newRow=[num,fmtF(doc.fecha_doc),empresa,tipoInf,cli.n,cli.r,cli.a,cli.t,cli.e,
         equ.t,equ.m,equ.o,equ.s,doc.frecuencia||'',estadoMant];
     }
 
@@ -1166,10 +1166,10 @@ async function guardarEnExcel(doc,num){
     }
 
     const ws=wb.Sheets[sheetName];
-    XLSX.utils.sheet_add_aoa(ws,[newRow],{origin:-1}); // append al final
+    XLSX.utils.sheet_add_aoa(ws,[newRow],{origin:-1});
 
-    // Subir Excel modificado
-    const outBuf=XLSX.write(wb,{type:'array',bookType:'xlsm',compression:true});
+    // Subir Excel modificado (bookVBA:true preserva macros y formato)
+    const outBuf=XLSX.write(wb,{type:'array',bookType:'xlsm',bookVBA:true});
     const upResp=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
       method:'POST',
       headers:{
