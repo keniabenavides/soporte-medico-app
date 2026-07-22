@@ -260,8 +260,23 @@ function addBD(k,r){try{const b=JSON.parse(localStorage.getItem('bd_'+k)||'[]');
 const DBX_APP_KEY='0dcfq8tmquthi0s';
 function getToken(){return localStorage.getItem('dbx_token')||'';}
 function dbxArg(obj){return JSON.stringify(obj).replace(/[^\x00-\x7F]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));}
+async function refreshAccessToken(){
+  const rt=localStorage.getItem('dbx_refresh');if(!rt)return null;
+  try{
+    const r=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Dropbox-URL':'https://api.dropbox.com/oauth2/token'},
+      body:JSON.stringify({grant_type:'refresh_token',refresh_token:rt,client_id:DBX_APP_KEY})
+    });
+    const d=await r.json();
+    if(d.access_token){localStorage.setItem('dbx_token',d.access_token);return d.access_token;}
+  }catch(e){}
+  return null;
+}
 async function ensureFreshToken(){
   const t=getToken();if(t)return t;
+  // Try to refresh automatically before asking the user
+  const refreshed=await refreshAccessToken();if(refreshed)return refreshed;
   return new Promise(resolve=>{
     const cv=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
     localStorage.setItem('pkce_cv',cv);
@@ -845,6 +860,17 @@ function renderPreview(doc){
     </div>
   </div>`;
   initFirma();
+  // Scale the document to fit narrow viewports (mobile) without clipping
+  const dw=document.getElementById('docPDF');
+  if(dw){
+    const vw=window.innerWidth;
+    const scale=Math.min(1,(vw-20)/800);
+    if(scale<1){
+      dw.style.transformOrigin='top left';
+      dw.style.transform='scale('+scale+')';
+      dw.style.marginBottom='-'+(dw.offsetHeight*(1-scale))+'px';
+    }
+  }
 }
 
 function renderItemsDoc(doc,secCls,hdrCls){
@@ -1044,6 +1070,12 @@ async function guardar(){
     await new Promise(r=>setTimeout(r,300));
     const el=document.getElementById('docPDF');
 
+    // Reset any preview scaling before PDF capture
+    const prevTransform=el.style.transform;
+    const prevOrigin=el.style.transformOrigin;
+    const prevMarginBottom=el.style.marginBottom;
+    el.style.transform='';el.style.transformOrigin='';el.style.marginBottom='';
+
     // Convertir todas las imágenes PNG a JPEG con fondo blanco (html2canvas renderiza transparencia como negro)
     const allImgs=[...el.querySelectorAll('img')];
     const origImgSrcs=allImgs.map(i=>i.src);
@@ -1071,6 +1103,8 @@ async function guardar(){
       }).from(el).outputPdf('blob');
     }finally{
       allImgs.forEach((i,idx)=>{i.src=origImgSrcs[idx];});
+      // Restore preview scaling
+      el.style.transform=prevTransform;el.style.transformOrigin=prevOrigin;el.style.marginBottom=prevMarginBottom;
     }
 
     showProg('Subiendo a Dropbox...','Creando carpetas automáticamente');
@@ -1111,7 +1145,12 @@ async function guardar(){
       const err=await resp.json().catch(()=>({}));
       hideProg();
       const msg=err.error_summary||err.error||'Error desconocido';
-      if(msg.includes('expired')||msg.includes('invalid_access_token')){toast('Token expirado. Reconfigura Dropbox.','err');modalDropbox();}
+      if(msg.includes('expired')||msg.includes('invalid_access_token')){
+        localStorage.removeItem('dbx_token');
+        const newTok=await refreshAccessToken();
+        if(newTok){toast('Token renovado automáticamente. Intenta guardar de nuevo.','ok');}
+        else{toast('Token expirado. Reconecta Dropbox.','err');modalDropbox();}
+      }
       else toast('Error Dropbox: '+msg,'err');
       if(btn){btn.disabled=false;btn.textContent='💾 Guardar PDF en Dropbox';}
       if(corrCache&&corrCache[doc.tipo])corrCache[doc.tipo]--;
