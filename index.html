@@ -257,8 +257,43 @@ function nextCorr(k){
 // ══ BD LOCAL ══
 function getBDKey(t){return{cot_sm:'cot_sm',inf_sm:'inf_sm',cot_cg:'cot_cg',inf_cg:'inf_cg',mant_sillon:'mant',mant_bomba:'mant',mant_concentrador:'mant',mant_autoclave:'mant'}[t]||t;}
 function addBD(k,r){try{const b=JSON.parse(localStorage.getItem('bd_'+k)||'[]');b.push(r);localStorage.setItem('bd_'+k,JSON.stringify(b));}catch{}}
+const DBX_APP_KEY='0dcfq8tmquthi0s';
 function getToken(){return localStorage.getItem('dbx_token')||'';}
 function dbxArg(obj){return JSON.stringify(obj).replace(/[^\x00-\x7F]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));}
+async function ensureFreshToken(){
+  const t=getToken();if(t)return t;
+  return new Promise(resolve=>{
+    const cv=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
+    localStorage.setItem('pkce_cv',cv);
+    crypto.subtle.digest('SHA-256',new TextEncoder().encode(cv)).then(h=>{
+      const cc=btoa(String.fromCharCode(...new Uint8Array(h))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+      const redirect=location.href.split('?')[0].split('#')[0];
+      const url=`https://www.dropbox.com/oauth2/authorize?client_id=${DBX_APP_KEY}&response_type=code&code_challenge=${cc}&code_challenge_method=S256&redirect_uri=${encodeURIComponent(redirect)}&token_access_type=offline`;
+      openModal(`<h3>Conectar con Dropbox</h3><p style="font-size:13px;margin-bottom:12px">Para guardar en Dropbox debes autorizar la app. Se abrirá Dropbox en una nueva pestaña — autoriza y luego pega aquí el código que te entrega.</p><button class="btn-pri" style="width:100%;margin-bottom:10px" onclick="window.open('${url}','_blank')">🔗 Abrir Dropbox para autorizar</button><div class="campo"><label>Pega el código aquí</label><input type="text" id="pkceCode" placeholder="Código de autorización..."></div><button class="btn-pri" style="width:100%;margin-top:8px" onclick="pkceExchange()">✅ Confirmar</button><button class="btn-cancel" onclick="closeModal();resolve(null)">Cancelar</button>`);
+      window._pkceResolve=resolve;
+    });
+  });
+}
+async function pkceExchange(){
+  const code=document.getElementById('pkceCode')?.value.trim();
+  if(!code){toast('Pega el código primero','err');return;}
+  const cv=localStorage.getItem('pkce_cv');
+  const redirect=location.href.split('?')[0].split('#')[0];
+  try{
+    const r=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Dropbox-URL':'https://api.dropbox.com/oauth2/token'},
+      body:JSON.stringify({code,grant_type:'authorization_code',client_id:DBX_APP_KEY,code_verifier:cv,redirect_uri:redirect})
+    });
+    const d=await r.json();
+    if(d.access_token){
+      localStorage.setItem('dbx_token',d.access_token);
+      if(d.refresh_token)localStorage.setItem('dbx_refresh',d.refresh_token);
+      closeModal();toast('✅ Dropbox conectado');
+      if(window._pkceResolve){window._pkceResolve(d.access_token);window._pkceResolve=null;}
+    } else {toast('Error: '+(d.error_description||d.error||'desconocido'),'err');}
+  }catch(e){toast('Error de conexión','err');}
+}
 
 // ══ HELPERS ══
 function hoy(){return new Date().toISOString().split('T')[0];}
@@ -629,7 +664,7 @@ function acCli(q){
   const list=document.getElementById('acCliList');
   if(!q||q.length<2){list.style.display='none';return;}
   const ql=q.toLowerCase();
-  const m=CLIENTES.filter(c=>(c.n+(c.d||'')).toLowerCase().includes(ql)).slice(0,10);
+  const m=CLIENTES.filter(c=>(c.n+(c.d||'')).toLowerCase().includes(ql)).slice(0,50);
   if(!m.length){list.style.display='none';return;}
   list.innerHTML=m.map(c=>`<div class="ac-item" onmousedown="pickCli(${CLIENTES.indexOf(c)})">${c.n}${c.d?' — '+c.d:''}</div>`).join('');
   list.style.display='block';
@@ -646,7 +681,7 @@ function acEqu(q){
   const list=document.getElementById('acEquList');
   if(!q||q.length<2){list.style.display='none';return;}
   const ql=q.toLowerCase();
-  const m=EQUIPOS.filter(e=>e.l.toLowerCase().includes(ql)).slice(0,12);
+  const m=EQUIPOS.filter(e=>e.l.toLowerCase().includes(ql)).slice(0,50);
   if(!m.length){list.style.display='none';return;}
   list.innerHTML=m.map(e=>`<div class="ac-item" onmousedown="pickEqu(${EQUIPOS.indexOf(e)})">${e.l}</div>`).join('');
   list.style.display='block';
@@ -713,7 +748,7 @@ function renderPreview(doc){
   const lbl=LABEL_A[tipo];
 
   const metaTitCls='doc-meta-tit '+hdrCls;
-  const BANCO_SM=`<div class="doc-banco"><strong>Datos de pago</strong>Cuenta: Chequera electrónica Banco Estado N° 38172176582<br>Nombre: Soporte Médico&amp;Dental SPA · RUT: 77.009.054-7<br>Email: equipos.medic@gmail.com<br><em style="font-size:10px;color:var(--txs)">Validez cotización: 15 días desde emisión</em></div>`;
+  const BANCO_SM=`<div class="doc-banco"><strong>Datos de pago</strong>Soporte Médico y Dental SPA · RUT: 77.009.054-7<br>Cta. Corriente BancoEstado N° 38100425871<br>Chequera Electrónica BancoEstado N° 38172176582<br>Email: equipos.medic@gmail.com<br><em style="font-size:10px;color:var(--txs)">Validez cotización: 15 días desde emisión</em></div>`;
   const BANCO_CG=`<div class="doc-banco"><strong>Datos de pago</strong>Boleta de honorarios a nombre de:<br>Carlos Guzmán Palma · RUT: 10.654.075-6<br>Email: equipos.medic@gmail.com</div>`;
 
   document.getElementById('pgPrev').innerHTML=`
@@ -817,7 +852,7 @@ function renderItemsDoc(doc,secCls,hdrCls){
   const m=doc.items;const isCG=doc.tipo==='cot_cg';const cls=isCG?'cg':'sm';
   const bancoDatos=isCG
     ?`Boleta de honorarios a nombre de:<br><strong>Carlos Guzmán Palma</strong> · RUT: 10.654.075-6<br>Email: equipos.medic@gmail.com`
-    :`Cuenta: Chequera electrónica BancoEstado N° 38172176582<br><strong>Soporte Médico&amp;Dental SPA</strong> · RUT: 77.009.054-7<br>Email: equipos.medic@gmail.com<br><span style="font-size:10px;color:var(--txs)">Validez: 15 días desde emisión</span>`;
+    :`Soporte Médico y Dental SPA · RUT: 77.009.054-7<br>Cta. Corriente BancoEstado N° 38100425871<br>Chequera Electrónica BancoEstado N° 38172176582<br>Email: equipos.medic@gmail.com<br><span style="font-size:10px;color:var(--txs)">Validez: 15 días desde emisión</span>`;
 
   if(isCG){
     return`<div class="doc-sec ${secCls}">Detalle del Trabajo</div>
@@ -856,22 +891,29 @@ function renderChecklistDoc(cl,secCls,tipo,tec){
   const thBg=esMant(tipo)?'var(--na)':isCG?'var(--tl)':'var(--az)';
   const resTblCls=isCG?'cg':'';
 
+  const chkTable=(items,titulo)=>{
+    const rows=[];
+    for(let i=0;i<items.length;i+=2){
+      const a=items[i],b=items[i+1];
+      rows.push(`<tr style="break-inside:avoid;page-break-inside:avoid">
+        <td class="chk-doc-row ${a.ok?'ok':'no'}" style="width:50%">${a.ok?'☑':'☐'} ${a.item}</td>
+        <td class="chk-doc-row ${b?b.ok?'ok':'no':''}" style="width:50%">${b?(b.ok?'☑':'☐')+' '+b.item:''}</td>
+      </tr>`);
+    }
+    return `<div class="doc-sec ${secCls}" style="break-after:avoid;page-break-after:avoid">${titulo}</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:10px"><tbody>${rows.join('')}</tbody></table>`;
+  };
+
   // Sección 1
-  let html=`<div class="doc-sec ${secCls}">${cl.sec1[0]?.sec||'Revisión y ajustes realizados'}</div>
-  <div class="chk-doc-grid">
-    ${cl.sec1.map(c=>`<div class="chk-doc-row ${c.ok?'ok':'no'}">${c.ok?'☑':'☐'} ${c.item}</div>`).join('')}
-  </div>`;
+  let html=chkTable(cl.sec1,cl.sec1[0]?.sec||'Revisión y ajustes realizados');
 
   // Sección 2 (solo si existe)
   if(cl.sec2&&cl.sec2.length>0){
-    html+=`<div class="doc-sec ${secCls}">${cl.sec2[0]?.sec||'Examen e inspección'}</div>
-    <div class="chk-doc-grid">
-      ${cl.sec2.map(c=>`<div class="chk-doc-row ${c.ok?'ok':'no'}">${c.ok?'☑':'☐'} ${c.item}</div>`).join('')}
-    </div>`;
+    html+=chkTable(cl.sec2,cl.sec2[0]?.sec||'Examen e inspección');
   }
 
   // Resumen
-  html+=`<div class="doc-sec ${secCls}">Resumen</div>
+  html+=`<div style="break-inside:avoid;page-break-inside:avoid"><div class="doc-sec ${secCls}" style="break-after:avoid;page-break-after:avoid">Resumen</div>
   <table class="resumen-tabla ${resTblCls}" style="--th-bg:${thBg}">
     <thead><tr>
       <th style="background:${thBg};text-align:center">Estado</th>
@@ -880,14 +922,14 @@ function renderChecklistDoc(cl,secCls,tipo,tec){
       <th style="background:${thBg}">Modelo</th>
     </tr></thead>
     <tbody>
-      ${cl.resumen.map(r=>`<tr>
+      ${cl.resumen.map(r=>`<tr style="break-inside:avoid;page-break-inside:avoid">
         <td style="text-align:center;font-size:16px">${r.estado==='OK'?'✅':r.estado==='NO'?'❌':'—'}</td>
         <td>${r.item}</td>
-        <td>${r.obs||'—'}</td>
+        <td style="white-space:pre-wrap;word-break:break-word">${r.obs||'—'}</td>
         <td>${r.modelo||'—'}</td>
       </tr>`).join('')}
     </tbody>
-  </table>`;
+  </table></div>`;
   return html;
 }
 
@@ -900,7 +942,7 @@ function initFirma(){
     return e.touches?[(e.touches[0].clientX-r.left)*sx,(e.touches[0].clientY-r.top)*sy]:[(e.clientX-r.left)*sx,(e.clientY-r.top)*sy];}
   function start(e){e.preventDefault();draw=true;[lx,ly]=pos(e);}
   function move(e){if(!draw)return;e.preventDefault();const[x,y]=pos(e);
-    ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(x,y);ctx.strokeStyle='#1a3a5c';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();[lx,ly]=[x,y];}
+    ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(x,y);ctx.strokeStyle='#1a3a5c';ctx.lineWidth=1.5;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();[lx,ly]=[x,y];}
   function end(){draw=false;firmaData=cv.toDataURL('image/png');}
   cv.addEventListener('mousedown',start);cv.addEventListener('mousemove',move);cv.addEventListener('mouseup',end);
   cv.addEventListener('touchstart',start,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',end);
@@ -912,8 +954,8 @@ function showProg(m,s){document.getElementById('progMsg').textContent=m||'';docu
 function hideProg(){document.getElementById('prog').classList.add('off');}
 
 async function guardar(){
-  const tok=getToken();
-  if(!tok){toast('Configura el token de Dropbox primero','err');modalDropbox();return;}
+  const tok=await ensureFreshToken();
+  if(!tok){toast('Se necesita autorización de Dropbox','err');return;}
 
   const cv=document.getElementById('firmaCanvas');if(cv)firmaData=cv.toDataURL('image/png');
   const nomFirmante=document.getElementById('iNombreFirmante')?.value.trim()||'';
@@ -1016,7 +1058,7 @@ async function guardar(){
 const EXCEL_PATH='/Soporte Medico/Registro historico informes, cotizaciones y mantencion.xlsm';
 
 async function guardarEnExcel(doc,num){
-  const tok=getToken();if(!tok)return;
+  const tok=await ensureFreshToken();if(!tok)return;
   try{
     // Descargar el archivo Excel actual
     const dlResp=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
@@ -1066,7 +1108,7 @@ async function guardarEnExcel(doc,num){
       sheetName='BD_mant';
       const tipoInf=NOMBRES[tipo].replace('\\n',' ');
       const estadoMant=doc.checklist?.resumen?.map(r=>r.item+(r.estado?' ('+r.estado+')':'')).join(', ')||'';
-      newRow=[doc.fecha_doc,empresa,tipoInf,cli.n,cli.r,cli.a,cli.t,cli.e,
+      newRow=[num,doc.fecha_doc,empresa,tipoInf,cli.n,cli.r,cli.a,cli.t,cli.e,
         equ.t,equ.m,equ.o,equ.s,doc.frecuencia||'',estadoMant];
     }
 
@@ -1180,25 +1222,14 @@ function persist(){localStorage.setItem('cli',JSON.stringify(CLIENTES));localSto
 // ══ DROPBOX CONFIG ══
 function modalDropbox(){const t=getToken();
   openModal(`<h3>Configurar Dropbox</h3>
-    <div class="config-card">
-      <strong>⚠️ Cómo abrir la app correctamente</strong><br><br>
-      El archivo HTML <strong>NO puede abrirse directamente</strong> desde el escritorio (doble clic). Debes usar una de estas opciones:<br><br>
-      <strong>Opción A — Desde Dropbox Web (recomendado):</strong><br>
-      Sube el archivo .html a tu Dropbox → ábrelo en dropbox.com → clic en "Abrir" → se abre en el navegador con acceso completo.<br><br>
-      <strong>Opción B — Servidor local (PC/Mac):</strong><br>
-      Abre Terminal y escribe: <code style="background:#fff;padding:2px 6px;border-radius:4px">python3 -m http.server 8080</code> en la carpeta donde está el archivo. Luego abre <code style="background:#fff;padding:2px 6px;border-radius:4px">http://localhost:8080/soporte_medico_v5.html</code><br><br>
-      <strong>¿Cómo obtener el token?</strong><br><br>
-      1. Ir a <a href="https://www.dropbox.com/developers/apps" target="_blank">dropbox.com/developers/apps</a><br>
-      2. Crear app → <strong>Scoped access</strong> → <strong>Full Dropbox</strong><br>
-      3. Nombre ej: "Soporte Médico App" → Create app<br>
-      4. Pestaña <strong>Permissions</strong> → activar <strong>files.content.write</strong> y <strong>files.content.read</strong> → Submit<br>
-      5. Pestaña <strong>Settings</strong> → sección <em>OAuth 2</em> → <strong>Generate</strong><br>
-      6. Copiar y pegar el token aquí
-    </div>
-    <div class="campo"><label>Access Token</label><input type="password" id="mTok" value="${t}" placeholder="sl.xxxxxxxxx..."></div>
+    ${t?`<div class="config-card" style="margin-bottom:10px">✅ Dropbox conectado. Puedes reconectar si tienes problemas.</div>`:''}
+    <button class="btn-pri" style="width:100%;margin-bottom:10px" onclick="ensureFreshToken().then(t=>{if(t)closeModal();})">🔗 Conectar con Dropbox</button>
+    <div style="font-size:12px;color:var(--txs);margin-bottom:10px;text-align:center">— o ingresa el token manualmente —</div>
+    <div class="campo"><label>Access Token manual</label><input type="password" id="mTok" value="${t}" placeholder="sl.xxxxxxxxx..."></div>
     <button class="btn-pri" style="width:100%;margin-top:8px" onclick="saveTok()">Guardar token</button>
     <button type="button" style="width:100%;margin-top:8px;background:none;border:1.5px solid var(--azc);border-radius:10px;padding:12px;font-size:14px;color:var(--azc)" onclick="testDropbox()">🔍 Probar conexión</button>
     <div id="dbxTestResult" style="margin-top:8px;font-size:13px;display:none"></div>
+    ${t?`<button type="button" style="width:100%;margin-top:8px;background:none;border:1.5px solid var(--ro);border-radius:10px;padding:10px;font-size:13px;color:var(--ro)" onclick="localStorage.removeItem('dbx_token');localStorage.removeItem('dbx_refresh');closeModal();toast('Token eliminado')">🗑 Desconectar Dropbox</button>`:''}
     <button class="btn-cancel" onclick="closeModal()">Cancelar</button>`);}
 async function testDropbox(){
   const t=document.getElementById('mTok')?.value.trim()||getToken();
