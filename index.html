@@ -260,24 +260,44 @@ function getBDKey(t){return{cot_sm:'cot_sm',inf_sm:'inf_sm',cot_cg:'cot_cg',inf_
 function addBD(k,r){try{const b=JSON.parse(localStorage.getItem('bd_'+k)||'[]');b.push(r);localStorage.setItem('bd_'+k,JSON.stringify(b));}catch{}}
 const DBX_APP_KEY='0dcfq8tmquthi0s';
 function getToken(){return localStorage.getItem('dbx_token')||'';}
+// El access token de Dropbox dura solo unas horas; guardamos su expiración real (o un estimado
+// conservador de 4h si Dropbox no la informa) para saber cuándo renovarlo SIN esperar a que falle.
+function tokenVigente(){
+  const t=getToken();if(!t)return null;
+  const exp=parseInt(localStorage.getItem('dbx_token_exp')||'0');
+  if(exp&&Date.now()>exp-60000)return null; // vence en <1min o ya venció: forzar renovación
+  return t;
+}
+function guardarToken(access_token,expires_in){
+  localStorage.setItem('dbx_token',access_token);
+  const ttl=(expires_in?parseInt(expires_in):14400)*1000; // 14400s=4h, valor típico de Dropbox
+  localStorage.setItem('dbx_token_exp',String(Date.now()+ttl));
+}
 function dbxArg(obj){return JSON.stringify(obj).replace(/[^\x00-\x7F]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));}
+let _refreshInFlight=null;
 async function refreshAccessToken(){
   const rt=localStorage.getItem('dbx_refresh');if(!rt)return null;
-  try{
-    const r=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','X-Dropbox-URL':'https://api.dropbox.com/oauth2/token'},
-      body:JSON.stringify({grant_type:'refresh_token',refresh_token:rt,client_id:DBX_APP_KEY})
-    });
-    const d=await r.json();
-    if(d.access_token){localStorage.setItem('dbx_token',d.access_token);return d.access_token;}
-  }catch(e){}
-  return null;
+  // Evita disparar múltiples refresh en paralelo si varias llamadas piden token al mismo tiempo
+  if(_refreshInFlight)return _refreshInFlight;
+  _refreshInFlight=(async()=>{
+    try{
+      const r=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Dropbox-URL':'https://api.dropbox.com/oauth2/token'},
+        body:JSON.stringify({grant_type:'refresh_token',refresh_token:rt,client_id:DBX_APP_KEY})
+      });
+      const d=await r.json();
+      if(d.access_token){guardarToken(d.access_token,d.expires_in);return d.access_token;}
+    }catch(e){}
+    return null;
+  })();
+  try{return await _refreshInFlight;}finally{_refreshInFlight=null;}
 }
 async function ensureFreshToken(){
-  const t=getToken();if(t)return t;
-  // Try to refresh automatically before asking the user
+  const t=tokenVigente();if(t)return t;
+  // Token ausente o vencido: renovar en silencio con el refresh token (sin pedir nada al usuario)
   const refreshed=await refreshAccessToken();if(refreshed)return refreshed;
+  // Solo si NUNCA se ha conectado Dropbox (no hay refresh token) se pide autorización manual
   return new Promise(resolve=>{
     const cv=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
     localStorage.setItem('pkce_cv',cv);
@@ -303,7 +323,7 @@ async function pkceExchange(){
     });
     const d=await r.json();
     if(d.access_token){
-      localStorage.setItem('dbx_token',d.access_token);
+      guardarToken(d.access_token,d.expires_in);
       if(d.refresh_token)localStorage.setItem('dbx_refresh',d.refresh_token);
       closeModal();toast('✅ Dropbox conectado');
       if(window._pkceResolve){window._pkceResolve(d.access_token);window._pkceResolve=null;}
@@ -1141,7 +1161,7 @@ async function guardar(){
       hideProg();
       const msg=err.error_summary||err.error||'Error desconocido';
       if(msg.includes('expired')||msg.includes('invalid_access_token')){
-        localStorage.removeItem('dbx_token');
+        localStorage.removeItem('dbx_token');localStorage.removeItem('dbx_token_exp');
         const newTok=await refreshAccessToken();
         if(newTok){toast('Token renovado automáticamente. Intenta guardar de nuevo.','ok');}
         else{toast('Token expirado. Reconecta Dropbox.','err');modalDropbox();}
@@ -1436,7 +1456,7 @@ function saveEE(idx){const t=document.getElementById('mTT').value.trim(),m=docum
   EQUIPOS[idx]={l:[t,m,o,s].filter(Boolean).join(' '),t,m,o,s,da,ba};persist();closeModal();toast('Equipo actualizado','ok');renderMant();}
 const CLI_PATH='/Soporte Medico/config/clientes.json';
 const EQU_PATH='/Soporte Medico/config/equipos.json';
-async function _tokenSilencioso(){return getToken()||await refreshAccessToken();}
+async function _tokenSilencioso(){return tokenVigente()||await refreshAccessToken();}
 function persist(){
   localStorage.setItem('cli',JSON.stringify(CLIENTES));
   localStorage.setItem('equ',JSON.stringify(EQUIPOS));
@@ -1455,16 +1475,16 @@ async function loadCliEqu(){
 }
 
 // ══ DROPBOX CONFIG ══
-function modalDropbox(){const t=getToken();
+function modalDropbox(){const t=getToken();const hasRefresh=!!localStorage.getItem('dbx_refresh');
   openModal(`<h3>Configurar Dropbox</h3>
-    ${t?`<div class="config-card" style="margin-bottom:10px">✅ Dropbox conectado. Puedes reconectar si tienes problemas.</div>`:''}
+    ${t?`<div class="config-card" style="margin-bottom:10px">✅ Dropbox conectado${hasRefresh?' — el token se renueva automáticamente, sin necesidad de reconectar':'.'} Puedes reconectar si tienes problemas.</div>`:''}
     <button class="btn-pri" style="width:100%;margin-bottom:10px" onclick="ensureFreshToken().then(t=>{if(t)closeModal();})">🔗 Conectar con Dropbox</button>
     <div style="font-size:12px;color:var(--txs);margin-bottom:10px;text-align:center">— o ingresa el token manualmente —</div>
     <div class="campo"><label>Access Token manual</label><input type="password" id="mTok" value="${t}" placeholder="sl.xxxxxxxxx..."></div>
     <button class="btn-pri" style="width:100%;margin-top:8px" onclick="saveTok()">Guardar token</button>
     <button type="button" style="width:100%;margin-top:8px;background:none;border:1.5px solid var(--azc);border-radius:10px;padding:12px;font-size:14px;color:var(--azc)" onclick="testDropbox()">🔍 Probar conexión</button>
     <div id="dbxTestResult" style="margin-top:8px;font-size:13px;display:none"></div>
-    ${t?`<button type="button" style="width:100%;margin-top:8px;background:none;border:1.5px solid var(--ro);border-radius:10px;padding:10px;font-size:13px;color:var(--ro)" onclick="localStorage.removeItem('dbx_token');localStorage.removeItem('dbx_refresh');closeModal();toast('Token eliminado')">🗑 Desconectar Dropbox</button>`:''}
+    ${t?`<button type="button" style="width:100%;margin-top:8px;background:none;border:1.5px solid var(--ro);border-radius:10px;padding:10px;font-size:13px;color:var(--ro)" onclick="localStorage.removeItem('dbx_token');localStorage.removeItem('dbx_token_exp');localStorage.removeItem('dbx_refresh');closeModal();toast('Token eliminado')">🗑 Desconectar Dropbox</button>`:''}
     <button class="btn-cancel" onclick="closeModal()">Cancelar</button>`);}
 async function testDropbox(){
   const t=document.getElementById('mTok')?.value.trim()||getToken();
@@ -1499,7 +1519,7 @@ async function testDropbox(){
     }
   }
 }
-function saveTok(){const t=document.getElementById('mTok').value.trim();if(!t){toast('Ingresa el token','err');return;}localStorage.setItem('dbx_token',t);closeModal();toast('Token guardado','ok');}
+function saveTok(){const t=document.getElementById('mTok').value.trim();if(!t){toast('Ingresa el token','err');return;}localStorage.setItem('dbx_token',t);localStorage.removeItem('dbx_token_exp');closeModal();toast('Token guardado','ok');}
 
 // ══ MODAL / TOAST ══
 function openModal(html){document.getElementById('modalCont').innerHTML=html;document.getElementById('modalBg').classList.remove('off');}
