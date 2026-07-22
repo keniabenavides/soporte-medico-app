@@ -1050,30 +1050,16 @@ async function guardar(){
     const origImgSrcs=allImgs.map(i=>i.src);
     await Promise.all(allImgs.map(async i=>{i.src=await pngToJpegWhite(i.src);}));
 
-    // Mover el elemento a un wrapper off-screen de ancho fijo para que html2canvas capture desde x=0 sin margin:auto
-    const elParent=el.parentNode;const elSibling=el.nextSibling;
-    const pdfWrap=document.createElement('div');
-    pdfWrap.style.cssText='position:fixed;left:0;top:0;width:780px;margin:0;padding:0;background:#fff;overflow:visible;z-index:99999;opacity:0;pointer-events:none;';
-    document.body.appendChild(pdfWrap);
-    const prevMargin=el.style.margin;const prevMaxW=el.style.maxWidth;const prevShadow=el.style.boxShadow;
-    el.style.margin='0';el.style.maxWidth='none';el.style.boxShadow='none';
-    pdfWrap.appendChild(el);
-    await new Promise(r=>setTimeout(r,200));
-
     let pdfBlob;
     try{
       pdfBlob=await html2pdf().set({
         margin:[6,6,6,6],filename:`${LABEL_A[doc.tipo]} N°${num}.pdf`,
         image:{type:'jpeg',quality:0.95},
-        html2canvas:{scale:2,useCORS:true,logging:false,scrollY:0,scrollX:0,windowWidth:780,backgroundColor:'#ffffff'},
+        html2canvas:{scale:2,useCORS:true,logging:false,scrollY:0,scrollX:0,windowWidth:1000,backgroundColor:'#ffffff'},
         jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
         pagebreak:{mode:['css','legacy']}
       }).from(el).outputPdf('blob');
     }finally{
-      // Restaurar elemento a su posición original
-      el.style.margin=prevMargin;el.style.maxWidth=prevMaxW;el.style.boxShadow=prevShadow;
-      if(elSibling)elParent.insertBefore(el,elSibling);else elParent.appendChild(el);
-      pdfWrap.remove();
       allImgs.forEach((i,idx)=>{i.src=origImgSrcs[idx];});
     }
 
