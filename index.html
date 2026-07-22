@@ -81,6 +81,7 @@ button{cursor:pointer;font-family:inherit}
 .doc-hdr.cg{border-bottom-color:var(--tl)}
 .doc-hdr-logo{flex-shrink:0;padding:4px 0}
 .doc-hdr-logo img{height:79px;max-width:230px;object-fit:contain;display:block}
+.doc-hdr.cg .doc-hdr-logo img{height:99px;max-width:288px}
 .doc-hdr-empresa{flex:1;padding:0 14px}
 .doc-hdr-empresa .nombre{font-size:16px;font-weight:700;letter-spacing:.2px;color:var(--az)}
 .doc-hdr-empresa.cg .nombre{color:var(--tl)}
@@ -518,10 +519,9 @@ function renderFormCot(tipo){
       </div>
       <button class="btn-add-sm" onclick="addItem()">+ Agregar ítem</button>
       <div class="campo-row" style="margin-top:12px">
-        <div class="campo"><label>Total Honorarios (CLP)</label><input type="number" id="iHon" style="text-align:right" placeholder="0" oninput="calcCG()"></div>
         <div class="campo"><label>Retención (%)</label><input type="number" id="iRetPct" value="14.5" step="0.1" oninput="calcCG()"></div>
+        <div class="campo"><label>Tipo de Pago</label><select id="iTipoPago"><option>Boleta</option><option>Factura</option></select></div>
       </div>
-      <div class="campo"><label>Tipo de Pago</label><select id="iTipoPago"><option>Boleta</option><option>Factura</option></select></div>
       <table class="monto-tabla"><tr><td class="lbl">Total honorario</td><td class="val" id="cHon">$ 0</td></tr>
         <tr><td class="lbl">Retención</td><td class="val" id="cRet">$ 0</td></tr>
         <tr class="tot"><td>Total a recibir</td><td class="val" id="cTotCG">$ 0</td></tr></table>
@@ -557,7 +557,6 @@ function calcSM(){
 function calcCG(){
   let hon=0;
   document.querySelectorAll('#itemsCont .item-row input[type=number]').forEach(i=>hon+=parseFloat(i.value)||0);
-  if(!hon)hon=parseFloat(document.getElementById('iHon')?.value)||0;
   const pct=parseFloat(document.getElementById('iRetPct')?.value)||14.5;
   const ret=Math.round(hon*pct/100);
   const h=document.getElementById('cHon'),r=document.getElementById('cRet'),tc=document.getElementById('cTotCG');
@@ -572,7 +571,6 @@ function getItems(tipo){
   });
   if(tipo==='cot_cg'){
     let hon=items.reduce((a,i)=>a+i.val,0);
-    if(!hon)hon=parseFloat(document.getElementById('iHon')?.value)||0;
     const pct=parseFloat(document.getElementById('iRetPct')?.value)||14.5;
     const ret=Math.round(hon*pct/100);
     return{cg:true,items,honorario:hon,pct,retencion:ret,total:hon-ret,tipo_pago:document.getElementById('iTipoPago')?.value||'Boleta'};
@@ -847,8 +845,8 @@ function renderPreview(doc){
           <div class="firma-bloque">
             <div class="firma-tec-wrap">
               <div style="display:flex;align-items:center;justify-content:center;gap:16px;background:#fff;padding:4px;border-radius:4px">
-                <img style="max-height:138px;max-width:300px;object-fit:contain;background:#fff" src="${firma}" alt="Firma">
-                <img style="max-height:70px;max-width:154px;object-fit:contain;background:#fff" src="${timbre}" alt="Timbre">
+                <img style="max-height:138px;max-width:300px;object-fit:contain;background:#fff;filter:contrast(1.4) brightness(0.82) saturate(1.15)" src="${firma}" alt="Firma">
+                <img style="max-height:70px;max-width:154px;object-fit:contain;background:#fff;filter:contrast(1.4) brightness(0.82) saturate(1.15)" src="${timbre}" alt="Timbre">
               </div>
             </div>
             <div class="firma-linea"></div>
@@ -966,26 +964,31 @@ function limpiarFirma(){const cv=document.getElementById('firmaCanvas');if(cv){c
 function showProg(m,s){document.getElementById('progMsg').textContent=m||'';document.getElementById('progSub').textContent=s||'';document.getElementById('prog').classList.remove('off');}
 function hideProg(){document.getElementById('prog').classList.add('off');}
 
-// Convierte data URL de PNG a JPEG con fondo blanco (elimina transparencia que html2canvas renderiza como negro)
-function pngToJpegWhite(dataUrl){
+// Convierte imagen a JPEG con fondo blanco (elimina transparencia que html2canvas renderiza como negro).
+// Con enhance=true renderiza a 2x y aplica contraste/oscurecimiento para firma y timbre más nítidos al imprimir.
+function pngToJpegWhite(dataUrl,enhance=false){
   return new Promise(resolve=>{
-    if(!dataUrl||(!dataUrl.startsWith('data:image/png')&&!dataUrl.startsWith('data:image'))){resolve(dataUrl);return;}
+    if(!dataUrl){resolve(dataUrl);return;}
+    if(!enhance&&!dataUrl.startsWith('data:image')){resolve(dataUrl);return;}
     const img=new Image();
-    img.onload=()=>{
-      const w=img.naturalWidth||img.width||300;
-      const h=img.naturalHeight||img.height||120;
-      const cv=document.createElement('canvas');cv.width=w;cv.height=h;
-      const ctx=cv.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,w,h);
-      ctx.drawImage(img,0,0,w,h);resolve(cv.toDataURL('image/jpeg',0.95));
+    const proc=()=>{
+      try{
+        const w=img.naturalWidth||img.width||300;
+        const h=img.naturalHeight||img.height||120;
+        const sc=enhance?2:1;
+        const cv=document.createElement('canvas');cv.width=w*sc;cv.height=h*sc;
+        const ctx=cv.getContext('2d');
+        ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);
+        ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+        if(enhance)ctx.filter='contrast(1.4) brightness(0.82) saturate(1.15)';
+        ctx.drawImage(img,0,0,cv.width,cv.height);
+        resolve(cv.toDataURL('image/jpeg',0.95));
+      }catch(e){resolve(dataUrl);}
     };
+    img.onload=proc;
     img.onerror=()=>resolve(dataUrl);
     img.src=dataUrl;
-    if(img.complete&&img.naturalWidth){
-      const w=img.naturalWidth;const h=img.naturalHeight;
-      const cv=document.createElement('canvas');cv.width=w;cv.height=h;
-      const ctx=cv.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,w,h);
-      ctx.drawImage(img,0,0,w,h);resolve(cv.toDataURL('image/jpeg',0.95));
-    }
+    if(img.complete&&img.naturalWidth)proc();
   });
 }
 
@@ -1057,7 +1060,7 @@ async function guardar(){
     // Convertir todas las imágenes PNG a JPEG con fondo blanco (html2canvas renderiza transparencia como negro)
     const allImgs=[...el.querySelectorAll('img')];
     const origImgSrcs=allImgs.map(i=>i.src);
-    await Promise.all(allImgs.map(async i=>{i.src=await pngToJpegWhite(i.src);}));
+    await Promise.all(allImgs.map(async i=>{i.src=await pngToJpegWhite(i.src,i.alt==='Firma'||i.alt==='Timbre');}));
 
     let pdfBlob;
     try{
