@@ -1053,7 +1053,7 @@ async function guardar(){
     // Mover el elemento a un wrapper off-screen de ancho fijo para que html2canvas capture desde x=0 sin margin:auto
     const elParent=el.parentNode;const elSibling=el.nextSibling;
     const pdfWrap=document.createElement('div');
-    pdfWrap.style.cssText='position:fixed;left:-9999px;top:0;width:780px;margin:0;padding:0;background:#fff;overflow:visible;z-index:-1;';
+    pdfWrap.style.cssText='position:fixed;left:0;top:0;width:780px;margin:0;padding:0;background:#fff;overflow:visible;z-index:99999;opacity:0;pointer-events:none;';
     document.body.appendChild(pdfWrap);
     const prevMargin=el.style.margin;const prevMaxW=el.style.maxWidth;const prevShadow=el.style.boxShadow;
     el.style.margin='0';el.style.maxWidth='none';el.style.boxShadow='none';
