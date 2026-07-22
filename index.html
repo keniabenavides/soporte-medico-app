@@ -104,11 +104,11 @@ button{cursor:pointer;font-family:inherit}
 .doc-fila .k{color:var(--txs);min-width:64px;flex-shrink:0;font-size:12px}
 .doc-fila .v{font-weight:500;color:var(--tx);word-wrap:break-word;overflow-wrap:break-word;min-width:0;word-break:break-word}
 /* Sección título */
-.doc-sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;border-bottom:2px solid;padding:5px 10px 4px;margin:14px 0 8px;border-radius:3px 3px 0 0}
+.doc-sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;border-bottom:2px solid;padding:5px 10px 4px;margin:14px 0 8px;border-radius:3px 3px 0 0;break-inside:avoid;page-break-inside:avoid;break-after:avoid;page-break-after:avoid}
 .doc-sec.sm{color:#fff;background:var(--az);border-color:var(--az)}
 .doc-sec.cg{color:#fff;background:var(--tl);border-color:var(--tl)}
 .doc-sec.mant{color:#fff;background:var(--na);border-color:var(--na)}
-.doc-detalle{background:var(--gr);border-radius:0 0 6px 6px;padding:10px 12px;margin-bottom:6px;font-size:12px;line-height:1.6;border:1px solid var(--grb);border-top:none;word-wrap:break-word;overflow-wrap:break-word;word-break:break-word}
+.doc-detalle{background:var(--gr);border-radius:0 0 6px 6px;padding:10px 12px;margin-bottom:6px;font-size:12px;line-height:1.6;border:1px solid var(--grb);border-top:none;word-wrap:break-word;overflow-wrap:break-word;word-break:break-word;break-inside:avoid;page-break-inside:avoid}
 /* Tabla ítems cotización - como PDF referencia */
 .doc-items{width:100%;border-collapse:collapse;margin-bottom:0;font-size:12px;font-family:Arial,sans-serif}
 .doc-items thead tr{border-bottom:2px solid}
@@ -122,7 +122,8 @@ button{cursor:pointer;font-family:inherit}
 .doc-items.sm tr.tot-row td{color:var(--az);border-color:var(--az)}
 .doc-items.cg tr.tot-row td{color:var(--tl);border-color:var(--tl)}
 /* Sección banco + totales (como PDF referencia) */
-.doc-totales-wrap{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:8px;border:1px solid var(--grb);border-radius:6px;overflow:hidden}
+.doc-totales-wrap{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:8px;border:1px solid var(--grb);border-radius:6px;overflow:hidden;break-inside:avoid;page-break-inside:avoid}
+.doc-items tr,.resumen-tabla tr{break-inside:avoid;page-break-inside:avoid}
 .doc-banco{padding:10px 12px;font-size:12px;line-height:1.7;color:var(--tx);background:#f9fafb;word-wrap:break-word;overflow-wrap:break-word}
 .doc-banco strong{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--txs);margin-bottom:4px}
 .doc-montos{display:flex;flex-direction:column;border-left:1px solid var(--grb)}
@@ -817,15 +818,15 @@ function renderPreview(doc){
         </div>
 
         ${doc.items?renderItemsDoc(doc,secCls,hdrCls):''}
-        ${(()=>{const pp=(doc.procs||[]).filter(p=>p&&p.trim());return pp.length?`<div style="break-inside:avoid;page-break-inside:avoid"><div class="doc-sec ${secCls}">Procedimientos</div>${pp.map((p,i)=>`<div class="doc-detalle" style="margin-bottom:4px;border-radius:4px"><span style="font-size:11px;font-weight:700;color:var(--txs);margin-right:6px">${i+1}.</span>${p}</div>`).join('')}</div>`:'';})()}
-        ${doc.resultado&&doc.resultado.trim()?`<div class="doc-sec ${secCls}">Resultado Final</div><div class="doc-detalle" style="font-weight:700;color:${(esCG(tipo)||tecnicoEsCG(tec))?'var(--tl)':'var(--az)'}">${doc.resultado}</div>`:''}
+        ${(()=>{const pp=(doc.procs||[]).filter(p=>p&&p.trim());return pp.length?(()=>{const it=pp.map((p,i)=>`<div class="doc-detalle" style="margin-bottom:4px;border-radius:4px"><span style="font-size:11px;font-weight:700;color:var(--txs);margin-right:6px">${i+1}.</span>${p}</div>`);return`<div><div style="break-inside:avoid;page-break-inside:avoid"><div class="doc-sec ${secCls}">Procedimientos</div>${it[0]}</div>${it.slice(1).join('')}</div>`;})():'';})()}
+        ${doc.resultado&&doc.resultado.trim()?`<div style="break-inside:avoid;page-break-inside:avoid"><div class="doc-sec ${secCls}">Resultado Final</div><div class="doc-detalle" style="font-weight:700;color:${(esCG(tipo)||tecnicoEsCG(tec))?'var(--tl)':'var(--az)'}">${doc.resultado}</div></div>`:''}
         ${doc.checklist?renderChecklistDoc(doc.checklist,secCls,doc.tipo,tec):''}
 
         ${doc.rep_inst||doc.rep_sol||doc.obs?`
           <div class="doc-sec ${secCls}">Resumen Final</div>
-          ${doc.rep_inst?`<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:700;color:var(--txs);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Repuestos instalados</div><div class="doc-detalle">${doc.rep_inst}</div></div>`:''}
-          ${doc.rep_sol?`<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:700;color:var(--txs);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Repuestos solicitados</div><div class="doc-detalle">${doc.rep_sol}</div></div>`:''}
-          ${doc.obs?`<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:700;color:var(--txs);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Observaciones</div><div class="doc-detalle">${doc.obs}</div></div>`:''}
+          ${doc.rep_inst?`<div style="margin-bottom:8px"><div class="doc-detalle"><div style="font-size:11px;font-weight:700;color:var(--txs);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Repuestos instalados</div>${doc.rep_inst.replace(/\n/g,'<br>')}</div></div>`:''}
+          ${doc.rep_sol?`<div style="margin-bottom:8px"><div class="doc-detalle"><div style="font-size:11px;font-weight:700;color:var(--txs);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Repuestos solicitados</div>${doc.rep_sol.replace(/\n/g,'<br>')}</div></div>`:''}
+          ${doc.obs?`<div style="margin-bottom:8px"><div class="doc-detalle"><div style="font-size:11px;font-weight:700;color:var(--txs);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Observaciones</div>${doc.obs.replace(/\n/g,'<br>')}</div></div>`:''}
         `:''}
 
         <!-- FIRMAS: estilo PDF referencia -->
@@ -902,16 +903,17 @@ function renderChecklistDoc(cl,secCls,tipo,tec){
   const thBg=isCG?'var(--tl)':'var(--az)';
   const resTblCls=isCG?'cg':'';
 
-  // Checklist en dos columnas (dos ítems por fila), letra 12px
+  // Checklist en dos columnas (dos ítems por fila), letra 12px.
+  // El título va unido a la primera fila (tabla aparte) para que nunca quede huérfano al final de una página.
   const chkTable=(items,titulo)=>{
-    let rows='';
+    const rows=[];
     for(let i=0;i<items.length;i+=2){
       const a=items[i],b=items[i+1];
       const celda=c=>c?`<td class="chk-doc-row ${c.ok?'ok':'no'}" style="display:table-cell;width:50%;font-size:12px;padding:5px 10px;vertical-align:top">${c.ok?'☑':'☐'} ${c.item}</td>`:'<td style="width:50%"></td>';
-      rows+=`<tr style="break-inside:avoid;page-break-inside:avoid">${celda(a)}${celda(b)}</tr>`;
+      rows.push(`<tr style="break-inside:avoid;page-break-inside:avoid">${celda(a)}${celda(b)}</tr>`);
     }
-    return `<div class="doc-sec ${secCls}" style="break-after:avoid;page-break-after:avoid">${titulo}</div>
-    <table style="width:100%;border-collapse:separate;border-spacing:4px 3px;margin-bottom:10px"><tbody>${rows}</tbody></table>`;
+    const tbl=(r,mb)=>`<table style="width:100%;table-layout:fixed;border-collapse:separate;border-spacing:4px 3px;margin-bottom:${mb}"><tbody>${r}</tbody></table>`;
+    return `<div style="break-inside:avoid;page-break-inside:avoid"><div class="doc-sec ${secCls}">${titulo}</div>${tbl(rows[0]||'','0')}</div>${rows.length>1?tbl(rows.slice(1).join(''),'10px'):''}`;
   };
 
   // Sección 1
@@ -922,24 +924,26 @@ function renderChecklistDoc(cl,secCls,tipo,tec){
     html+=chkTable(cl.sec2,cl.sec2[0]?.sec||'Examen e inspección');
   }
 
-  // Resumen
-  html+=`<div style="break-inside:avoid;page-break-inside:avoid"><div class="doc-sec ${secCls}" style="break-after:avoid;page-break-after:avoid">Resumen</div>
-  <table class="resumen-tabla ${resTblCls}" style="--th-bg:${thBg}">
+  // Resumen: título + encabezado + primera fila unidos (nunca huérfanos); el resto de filas puede fluir a la página siguiente
+  const cols=`<colgroup><col style="width:12%"><col style="width:26%"><col style="width:37%"><col style="width:25%"></colgroup>`;
+  const resRow=r=>`<tr style="break-inside:avoid;page-break-inside:avoid">
+        <td style="text-align:center;font-size:16px">${r.estado==='OK'?'✅':r.estado==='NO'?'❌':'—'}</td>
+        <td>${r.item}</td>
+        <td style="white-space:pre-wrap;word-break:break-word">${r.obs||'—'}</td>
+        <td>${r.modelo||'—'}</td>
+      </tr>`;
+  const rowsRes=cl.resumen.map(resRow);
+  html+=`<div style="break-inside:avoid;page-break-inside:avoid"><div class="doc-sec ${secCls}">Resumen</div>
+  <table class="resumen-tabla ${resTblCls}" style="--th-bg:${thBg};table-layout:fixed">${cols}
     <thead><tr>
       <th style="background:${thBg};text-align:center">Estado</th>
       <th style="background:${thBg}">Ítem</th>
       <th style="background:${thBg}">Observaciones</th>
       <th style="background:${thBg}">Modelo</th>
     </tr></thead>
-    <tbody>
-      ${cl.resumen.map(r=>`<tr style="break-inside:avoid;page-break-inside:avoid">
-        <td style="text-align:center;font-size:16px">${r.estado==='OK'?'✅':r.estado==='NO'?'❌':'—'}</td>
-        <td>${r.item}</td>
-        <td style="white-space:pre-wrap;word-break:break-word">${r.obs||'—'}</td>
-        <td>${r.modelo||'—'}</td>
-      </tr>`).join('')}
-    </tbody>
-  </table></div>`;
+    <tbody>${rowsRes[0]||''}</tbody>
+  </table></div>
+  ${rowsRes.length>1?`<table class="resumen-tabla ${resTblCls}" style="--th-bg:${thBg};table-layout:fixed">${cols}<tbody>${rowsRes.slice(1).join('')}</tbody></table>`:''}`;
   return html;
 }
 
