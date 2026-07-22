@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Soporte Médico y Dental</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{--az:#203864;--azc:#2e6da4;--azs:#e8f1f9;--gr:#f4f6f8;--grb:#dce3ea;--tx:#1c2b3a;--txs:#5a7087;--ve:#203864;--ro:#c0392b;--na:#e67e22;--tl:#1D5657;--sh:0 2px 12px rgba(26,58,92,.10);--ra:10px}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -68,14 +68,14 @@ button{cursor:pointer;font-family:inherit}
 .btn-pri:hover{background:var(--azc)}.btn-pri:disabled{background:#888;cursor:not-allowed}
 .btn-sec{background:#fff;color:var(--az);border:1.5px solid var(--az);border-radius:10px;padding:14px;font-size:15px;font-weight:600}
 /* PREVIEW */
-.preview-page{padding:0;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.preview-page{padding:0}
 .prev-toolbar{background:#fff;padding:12px 20px;display:flex;gap:10px;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,.08);position:sticky;top:60px;z-index:50;flex-wrap:wrap}
 .btn-guardar{background:var(--ve);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:600}
 .btn-guardar:disabled{background:#888;cursor:not-allowed}
 .btn-editar{background:#fff;color:var(--az);border:1.5px solid var(--az);border-radius:8px;padding:10px 16px;font-size:14px}
 .doc-num-label{font-size:13px;color:var(--txs);margin-left:auto}
 /* DOCUMENTO */
-.doc-wrap{background:#fff;min-width:780px;max-width:780px;margin:20px auto;box-shadow:0 4px 24px rgba(0,0,0,.12);font-family:Arial,sans-serif;font-size:12px}
+.doc-wrap{background:#fff;max-width:780px;margin:20px auto;box-shadow:0 4px 24px rgba(0,0,0,.12);font-family:Arial,sans-serif;font-size:12px}
 /* Header: fondo blanco, logo izq + empresa centro + número der */
 .doc-hdr{background:#fff;color:var(--tx);padding:16px 22px;display:flex;align-items:center;gap:16px;min-height:113px;border-bottom:3px solid var(--az)}
 .doc-hdr.cg{border-bottom-color:var(--tl)}
@@ -860,17 +860,6 @@ function renderPreview(doc){
     </div>
   </div>`;
   initFirma();
-  // Scale the document to fit narrow viewports (mobile) without clipping
-  const dw=document.getElementById('docPDF');
-  if(dw){
-    const vw=window.innerWidth;
-    const scale=Math.min(1,(vw-20)/800);
-    if(scale<1){
-      dw.style.transformOrigin='top left';
-      dw.style.transform='scale('+scale+')';
-      dw.style.marginBottom='-'+(dw.offsetHeight*(1-scale))+'px';
-    }
-  }
 }
 
 function renderItemsDoc(doc,secCls,hdrCls){
@@ -1028,36 +1017,22 @@ async function guardar(){
   const btn=document.getElementById('btnG');
   if(btn){btn.disabled=true;btn.textContent='Guardando...';}
 
-  // Obtener correlativo desde el Excel (columna A de la hoja correspondiente)
+  // Descargar Excel una vez (ZIP crudo) para leer correlativo y reutilizarlo al guardar
   showProg('Obteniendo N° correlativo...','Consultando base de datos Excel');
-  let preloadedWb=null;
-  let num;
+  let _xlsxZip=null;
   try{
-    const tok2=getToken();
-    const XLSX=window.XLSX;
-    if(tok2&&XLSX){
-      const dlResp=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
-        method:'POST',
-        headers:{'Authorization':'Bearer '+tok2,'Dropbox-API-Arg':dbxArg({path:EXCEL_PATH}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}
-      });
-      if(dlResp.ok){
-        const xlsxBuf=await dlResp.arrayBuffer();
-        preloadedWb=XLSX.read(new Uint8Array(xlsxBuf),{type:'array',cellDates:true,bookVBA:true,cellStyles:true});
-        const sn=getSheetName(doc.tipo);
-        if(preloadedWb.SheetNames.includes(sn)){
-          const ws=preloadedWb.Sheets[sn];
-          const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-          let lastNum=0;
-          for(let i=rows.length-1;i>=1;i--){
-            const v=String(rows[i][0]||'').replace(/\D/g,'');
-            if(v){lastNum=parseInt(v)||0;break;}
-          }
-          num=String(lastNum+1).padStart(5,'0');
-        }
-      }
+    const dlResp=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':dbxArg({path:EXCEL_PATH}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}
+    });
+    if(dlResp.ok){
+      _xlsxZip=await window.JSZip.loadAsync(await dlResp.arrayBuffer());
     }
-  }catch(e){console.warn('Error leyendo correlativo desde Excel:',e);}
+  }catch(e){console.warn('Error descargando Excel:',e);}
+
+  let num=await _xlsxNextCorr(_xlsxZip,doc.tipo);
   if(!num)num=nextCorr(doc.tipo); // fallback al JSON si Excel no disponible
+  else{if(corrCache)corrCache[doc.tipo]=parseInt(num.replace(/\D/g,''))+1;}
 
   doc.numero=num;
   const nd=document.getElementById('docNumDisp');if(nd)nd.textContent=`N° ${num}`;
@@ -1067,37 +1042,25 @@ async function guardar(){
 
   try{
     window.scrollTo(0,0);
+    await new Promise(r=>setTimeout(r,300));
     const el=document.getElementById('docPDF');
-
-    // Remove preview scaling so element renders at full 780px, wait for repaint
-    const prevTransform=el.style.transform;
-    const prevOrigin=el.style.transformOrigin;
-    const prevMarginBottom=el.style.marginBottom;
-    el.style.transform='none';el.style.transformOrigin='';el.style.marginBottom='';
-    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-    await new Promise(r=>setTimeout(r,200));
 
     // Convertir todas las imágenes PNG a JPEG con fondo blanco (html2canvas renderiza transparencia como negro)
     const allImgs=[...el.querySelectorAll('img')];
     const origImgSrcs=allImgs.map(i=>i.src);
     await Promise.all(allImgs.map(async i=>{i.src=await pngToJpegWhite(i.src);}));
 
-    // Capture outerHTML after image conversion — avoids any position/offset inheritance
-    const htmlSnap=el.outerHTML;
-
     let pdfBlob;
     try{
       pdfBlob=await html2pdf().set({
         margin:[6,6,6,6],filename:`${LABEL_A[doc.tipo]} N°${num}.pdf`,
         image:{type:'jpeg',quality:0.95},
-        html2canvas:{scale:2,useCORS:true,logging:false,scrollY:0,scrollX:0,windowWidth:800,backgroundColor:'#ffffff'},
+        html2canvas:{scale:2,useCORS:true,logging:false,scrollY:0,scrollX:0},
         jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
         pagebreak:{mode:['css','legacy']}
-      }).from(htmlSnap).outputPdf('blob');
+      }).from(el).outputPdf('blob');
     }finally{
       allImgs.forEach((i,idx)=>{i.src=origImgSrcs[idx];});
-      // Restore preview scaling
-      el.style.transform=prevTransform;el.style.transformOrigin=prevOrigin;el.style.marginBottom=prevMarginBottom;
     }
 
     showProg('Subiendo a Dropbox...','Creando carpetas automáticamente');
@@ -1126,9 +1089,9 @@ async function guardar(){
 
     if(resp.ok){
       await saveCorr();
-      // Guardar en Excel BD
+      // Guardar en Excel BD (pasar ZIP ya descargado para no bajar dos veces)
       showProg('Actualizando base de datos...','Registrando en el Excel de Dropbox');
-      await guardarEnExcel(doc,num,preloadedWb);
+      await guardarEnExcel(doc,num,_xlsxZip);
       hideProg();
       toast(`✓ ${lblArch} N°${num} guardado`,'ok');
       document.querySelector('.doc-num-label').textContent=`${lblArch} N° ${num} — Guardado ✓`;
@@ -1172,22 +1135,21 @@ function getSheetName(tipo){
   return'';
 }
 
-async function guardarEnExcel(doc,num,preloadedWb=null){
+async function guardarEnExcel(doc,num,preloadedZip=null){
   const tok=await ensureFreshToken();if(!tok)return;
   try{
-    const XLSX=window.XLSX;
-    if(!XLSX){console.warn('SheetJS no disponible');return;}
+    const JSZip=window.JSZip;
+    if(!JSZip){console.warn('JSZip no disponible');return;}
 
-    let wb=preloadedWb;
-    if(!wb){
+    let zip=preloadedZip;
+    if(!zip){
       // Descargar el archivo Excel solo si no se pasó pre-cargado
       const dlResp=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
         method:'POST',
         headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':dbxArg({path:EXCEL_PATH}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}
       });
       if(!dlResp.ok){console.warn('No se pudo descargar el Excel BD');return;}
-      const xlsxBuf=await dlResp.arrayBuffer();
-      wb=XLSX.read(new Uint8Array(xlsxBuf),{type:'array',cellDates:true,bookVBA:true,cellStyles:true});
+      zip=await JSZip.loadAsync(await dlResp.arrayBuffer());
     }
     const tipo=doc.tipo;
     const cli=doc.cliente;
@@ -1223,15 +1185,38 @@ async function guardarEnExcel(doc,num,preloadedWb=null){
         equ.t,equ.m,equ.o,equ.s,doc.frecuencia||'',estadoMant];
     }
 
-    if(!sheetName||!wb.SheetNames.includes(sheetName)){
-      console.warn('Hoja no encontrada:',sheetName);return;
+    if(!sheetName)return;
+
+    // Edición XML directa: solo agrega la fila, el resto del archivo queda byte-idéntico
+    // (preserva formato de tabla, estilos, macros, anchos de columna, todo)
+    const wbXml=await zip.file('xl/workbook.xml').async('text');
+    const wsPath=await _xlsxResolveSheet(zip,wbXml,sheetName);
+    if(!wsPath){console.warn('Hoja no encontrada:',sheetName);return;}
+
+    let wsXml=await zip.file(wsPath).async('text');
+    const lastRow=_xlsxLastRow(wsXml);
+    const newRowNum=lastRow+1;
+    wsXml=_xlsxAppendRow(wsXml,newRow,newRowNum);
+    zip.file(wsPath,wsXml);
+
+    // Extender rango de tabla Excel (y autofiltro) para que la nueva fila quede dentro
+    const wsRelsPath=wsPath.replace('xl/worksheets/','xl/worksheets/_rels/')+'.rels';
+    const wsRelsFile=zip.file(wsRelsPath);
+    if(wsRelsFile){
+      const wsRels=await wsRelsFile.async('text');
+      for(const m of wsRels.matchAll(/Target="[^"]*tables\/([^"]+)"/g)){
+        const tblPath='xl/tables/'+m[1];
+        const tblFile=zip.file(tblPath);
+        if(tblFile){
+          let tblXml=await tblFile.async('text');
+          tblXml=tblXml.replace(/(<table\b[^>]+ref=")([^"]+)(")/,(_,a,ref,b)=>a+ref.split(':')[0]+':'+ref.split(':')[1].replace(/\d+/,newRowNum)+b);
+          tblXml=tblXml.replace(/(<autoFilter\b[^>]+ref=")([^"]+)(")/,(_,a,ref,b)=>a+ref.split(':')[0]+':'+ref.split(':')[1].replace(/\d+/,newRowNum)+b);
+          zip.file(tblPath,tblXml);
+        }
+      }
     }
 
-    const ws=wb.Sheets[sheetName];
-    XLSX.utils.sheet_add_aoa(ws,[newRow],{origin:-1});
-
-    // Subir Excel modificado (bookVBA:true preserva macros y formato)
-    const outBuf=XLSX.write(wb,{type:'array',bookType:'xlsm',bookVBA:true,cellStyles:true});
+    const outBuf=await zip.generateAsync({type:'arraybuffer',compression:'DEFLATE',compressionOptions:{level:6}});
     const upResp=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
       method:'POST',
       headers:{
@@ -1245,6 +1230,82 @@ async function guardarEnExcel(doc,num,preloadedWb=null){
     if(upResp.ok){console.log('BD Excel actualizado:',sheetName);}
     else{const e=await upResp.json().catch(()=>({}));console.warn('Error subiendo Excel:',e.error_summary||e);}
   }catch(e){console.warn('Error guardarEnExcel:',e.message);}
+}
+
+// ── Helpers XLSX (edición XML directa vía JSZip) ──
+async function _xlsxNextCorr(zip,tipo){
+  try{
+    if(!zip)return null;
+    const sheetName=getSheetName(tipo);
+    if(!sheetName)return null;
+    const wbXml=await zip.file('xl/workbook.xml').async('text');
+    const wsPath=await _xlsxResolveSheet(zip,wbXml,sheetName);
+    if(!wsPath)return null;
+    const wsXml=await zip.file(wsPath).async('text');
+    // Tabla de shared strings para celdas t="s"
+    let ss=[];
+    const ssFile=zip.file('xl/sharedStrings.xml');
+    if(ssFile){
+      const ssXml=await ssFile.async('text');
+      const siRx=/<si>([\s\S]*?)<\/si>/g;let sm;
+      while((sm=siRx.exec(ssXml))!==null){
+        const t=sm[1].match(/<t[^>]*>([^<]*)<\/t>/g)||[];
+        ss.push(t.map(x=>x.replace(/<[^>]+>/g,'')).join(''));
+      }
+    }
+    // Recorre todas las filas, busca el último valor no vacío en columna A
+    const rowRx=/<row r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g;
+    let lastNum=NaN;let m;
+    while((m=rowRx.exec(wsXml))!==null){
+      const cellM=m[2].match(/<c r="A\d+"([^>]*)>([\s\S]*?)<\/c>/);
+      if(!cellM)continue;
+      let val=null;
+      const attr=cellM[1];const inner=cellM[2];
+      if(attr.includes('t="s"')||attr.includes("t='s'")){
+        const idx=inner.match(/<v>(\d+)<\/v>/);
+        if(idx)val=ss[parseInt(idx[1])]||null;
+      }else if(attr.includes('inlineStr')){
+        const t=inner.match(/<t[^>]*>([^<]*)<\/t>/);val=t?t[1]:null;
+      }
+      // Omite celdas numéricas puras (pueden ser fechas seriales)
+      if(val&&val.trim()){const n=parseInt(val.replace(/\D/g,''));if(!isNaN(n))lastNum=n;}
+    }
+    if(isNaN(lastNum))return String(1).padStart(5,'0');
+    return String(lastNum+1).padStart(5,'0');
+  }catch(e){console.warn('_xlsxNextCorr:',e.message);return null;}
+}
+async function _xlsxResolveSheet(zip,wbXml,name){
+  const esc=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const m=wbXml.match(new RegExp('<sheet[^>]+name="'+esc+'"[^>]*r:id="([^"]+)"'))||
+           wbXml.match(new RegExp('<sheet[^>]+r:id="([^"]+)"[^>]*name="'+esc+'"'));
+  if(!m)return null;
+  const relsXml=await zip.file('xl/_rels/workbook.xml.rels').async('text');
+  // Busca el elemento Relationship con ese Id, sin importar el orden de atributos
+  const relM=relsXml.match(new RegExp('<Relationship\\b[^>]*\\bId="'+m[1]+'"[^>]*>'));
+  if(!relM)return null;
+  const tM=relM[0].match(/Target="([^"]+)"/);
+  if(!tM)return null;
+  const t=tM[1];return t.startsWith('/')?t.slice(1):t.startsWith('xl/')?t:'xl/'+t;
+}
+function _xlsxLastRow(wsXml){
+  const ms=[...wsXml.matchAll(/<row r="(\d+)"/g)];
+  return ms.length?Math.max(...ms.map(m=>+m[1])):0;
+}
+function _xlsxCol(i){
+  let s='',n=i+1;
+  while(n>0){const r=(n-1)%26;s=String.fromCharCode(65+r)+s;n=Math.floor((n-1)/26);}
+  return s;
+}
+function _xlsxEsc(v){return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function _xlsxAppendRow(wsXml,row,rowNum){
+  const cells=row.map((v,i)=>{
+    if(v===null||v===undefined||v==='')return '';
+    const a=_xlsxCol(i)+rowNum;
+    return typeof v==='number'?`<c r="${a}"><v>${v}</v></c>`:`<c r="${a}" t="inlineStr"><is><t>${_xlsxEsc(v)}</t></is></c>`;
+  }).join('');
+  wsXml=wsXml.replace('</sheetData>',`<row r="${rowNum}">${cells}</row></sheetData>`);
+  wsXml=wsXml.replace(/(<dimension ref=")[^"]*(")/,`$1A1:${_xlsxCol(row.length-1)}${rowNum}$2`);
+  return wsXml;
 }
 
 // ══ MANTENEDOR ══
