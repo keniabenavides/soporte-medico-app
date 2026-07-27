@@ -1000,12 +1000,42 @@ async function guardar(){
   }
 
   const doc=currentDoc;
-  const num=nextCorr(doc.tipo);
-  doc.numero=num;
-  const nd=document.getElementById('docNumDisp');if(nd)nd.textContent=`N° ${num}`;
-
   const btn=document.getElementById('btnG');
   if(btn){btn.disabled=true;btn.textContent='Guardando...';}
+
+  // Obtener correlativo desde el Excel (columna A de la hoja correspondiente)
+  showProg('Obteniendo N° correlativo...','Consultando base de datos Excel');
+  let preloadedWb=null;
+  let num;
+  try{
+    const tok2=getToken();
+    const XLSX=window.XLSX;
+    if(tok2&&XLSX){
+      const dlResp=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+tok2,'Dropbox-API-Arg':dbxArg({path:EXCEL_PATH}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}
+      });
+      if(dlResp.ok){
+        const xlsxBuf=await dlResp.arrayBuffer();
+        preloadedWb=XLSX.read(new Uint8Array(xlsxBuf),{type:'array',cellDates:true,bookVBA:true});
+        const sn=getSheetName(doc.tipo);
+        if(preloadedWb.SheetNames.includes(sn)){
+          const ws=preloadedWb.Sheets[sn];
+          const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+          let lastNum=0;
+          for(let i=rows.length-1;i>=1;i--){
+            const v=String(rows[i][0]||'').replace(/\D/g,'');
+            if(v){lastNum=parseInt(v)||0;break;}
+          }
+          num=String(lastNum+1).padStart(5,'0');
+        }
+      }
+    }
+  }catch(e){console.warn('Error leyendo correlativo desde Excel:',e);}
+  if(!num)num=nextCorr(doc.tipo); // fallback al JSON si Excel no disponible
+
+  doc.numero=num;
+  const nd=document.getElementById('docNumDisp');if(nd)nd.textContent=`N° ${num}`;
 
   addBD(getBDKey(doc.tipo),{...doc,firma:firmaData?'si':'no',firmante:nomFirmante,ts:new Date().toISOString()});
   showProg('Generando PDF...','Puede tomar 15-20 segundos');
@@ -1075,7 +1105,7 @@ async function guardar(){
       await saveCorr();
       // Guardar en Excel BD
       showProg('Actualizando base de datos...','Registrando en el Excel de Dropbox');
-      await guardarEnExcel(doc,num);
+      await guardarEnExcel(doc,num,preloadedWb);
       hideProg();
       toast(`✓ ${lblArch} N°${num} guardado`,'ok');
       document.querySelector('.doc-num-label').textContent=`${lblArch} N° ${num} — Guardado ✓`;
@@ -1105,56 +1135,60 @@ async function guardar(){
 
 // ══ GUARDAR EN EXCEL BD (Dropbox) ══
 const EXCEL_PATH='/Soporte Medico/Registro historico informes, cotizaciones y mantencion.xlsm';
+function getSheetName(tipo){
+  if(tipo==='cot_sm')return'BD_cotización';
+  if(tipo==='inf_sm')return'BD_informe';
+  if(tipo==='cot_cg')return'BD_cotización_CG';
+  if(tipo==='inf_cg')return'BD_informe_CG';
+  if(esMant(tipo))return'BD_mant';
+  return'';
+}
 
-async function guardarEnExcel(doc,num){
+async function guardarEnExcel(doc,num,preloadedWb=null){
   const tok=await ensureFreshToken();if(!tok)return;
   try{
-    // Descargar el archivo Excel actual
-    const dlResp=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':dbxArg({path:EXCEL_PATH}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}
-    });
-    if(!dlResp.ok){console.warn('No se pudo descargar el Excel BD');return;}
-    const xlsxBuf=await dlResp.arrayBuffer();
-
-    // Usar SheetJS para agregar la fila
     const XLSX=window.XLSX;
     if(!XLSX){console.warn('SheetJS no disponible');return;}
 
-    const wb=XLSX.read(new Uint8Array(xlsxBuf),{type:'array',cellDates:true,bookVBA:true});
+    let wb=preloadedWb;
+    if(!wb){
+      // Descargar el archivo Excel solo si no se pasó pre-cargado
+      const dlResp=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+tok,'Dropbox-API-Arg':dbxArg({path:EXCEL_PATH}),'X-Dropbox-URL':'https://content.dropboxapi.com/2/files/download'}
+      });
+      if(!dlResp.ok){console.warn('No se pudo descargar el Excel BD');return;}
+      const xlsxBuf=await dlResp.arrayBuffer();
+      wb=XLSX.read(new Uint8Array(xlsxBuf),{type:'array',cellDates:true,bookVBA:true});
+    }
     const tipo=doc.tipo;
     const cli=doc.cliente;
     const equ=doc.equipo;
     const empresa=esCG(tipo)||tecnicoEsCG(doc.tec)?'Carlos Guzmán Palma':'Soporte Médico';
     const fechasServStr=Array.isArray(doc.fechas_serv)?doc.fechas_serv.map(fmtF).join(' / '):doc.fechas_serv||'';
 
-    let sheetName='';let newRow=[];
+    let sheetName=getSheetName(tipo);let newRow=[];
     if(tipo==='cot_sm'){
-      sheetName='BD_cotización';
       const m=doc.items||{};
       const detalles=m.items?m.items.map(i=>i.desc).join(' / '):'';
       newRow=[num,fmtF(doc.fecha_doc),cli.n,cli.r,cli.a,cli.t,cli.e,
         fechasServStr,equ.t,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,
         m.subtotal||0,m.iva||0,m.total||0,m.tipo_pago||'',doc.fecha_doc?doc.fecha_doc.substring(0,4):''];
     } else if(tipo==='inf_sm'){
-      sheetName='BD_informe';
       const detalles=(doc.procs||[]).join(' / ');
       newRow=[num,fmtF(doc.fecha_doc),cli.n,cli.r,cli.a,cli.t,cli.e,
         fechasServStr,equ.t,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,doc.resultado||''];
     } else if(tipo==='cot_cg'){
-      sheetName='BD_cotización_CG';
       const m=doc.items||{};
       const detalles=m.items?m.items.map(i=>i.desc).join(' / '):'';
       newRow=[num,fmtF(doc.fecha_doc),cli.n,cli.r,cli.a,cli.t,cli.e,
         fechasServStr,equ.t,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,
         m.honorario||0,m.retencion||0,m.total||0,doc.fecha_doc?doc.fecha_doc.substring(0,4):'',m.pct||14.5,m.tipo_pago||''];
     } else if(tipo==='inf_cg'){
-      sheetName='BD_informe_CG';
       const detalles=(doc.procs||[]).join(' / ');
       newRow=[num,fmtF(doc.fecha_doc),cli.n,cli.r,cli.a,cli.t,cli.e,
         fechasServStr,equ.t,equ.m,equ.o,equ.s,doc.tipo_mant||'',doc.desc_falla||'',detalles,doc.resultado||''];
     } else if(esMant(tipo)){
-      sheetName='BD_mant';
       const tipoInf=NOMBRES[tipo].replace('\n',' ');
       const estadoMant=doc.checklist?.resumen?.map(r=>r.item+(r.estado?' ('+r.estado+')':'')).join(', ')||'';
       newRow=[num,fmtF(doc.fecha_doc),empresa,tipoInf,cli.n,cli.r,cli.a,cli.t,cli.e,
@@ -1204,12 +1238,14 @@ function renderMant(){
     <div style="font-size:12px;color:var(--txs);margin-bottom:8px">${busq.length>1?fil.length+' resultado(s)':'Primeros 30 — use búsqueda para filtrar'}</div>
     <div class="mant-lista">
       ${fil.map(d=>{const idx=data.indexOf(d);
-        if(mantTab==='clientes')return`<div class="mant-item"><div><div class="mant-item-nombre">${d.n}${d.d?' — '+d.d:''}</div><div class="mant-item-sub">RUT: ${d.r||'—'} | ${d.t||'—'}</div></div><button class="btn-edit" onclick="modalEditC(${idx})">Editar</button></div>`;
-        return`<div class="mant-item"><div><div class="mant-item-nombre">${d.l}</div><div class="mant-item-sub">Marca: ${d.m||'—'} | Modelo: ${d.o||'—'} | Serie: ${d.s||'—'}${d.da?' | Data: '+d.da:''}${d.ba?' | Baja: '+d.ba:''}</div></div><button class="btn-edit" onclick="modalEditE(${idx})">Editar</button></div>`;
+        if(mantTab==='clientes')return`<div class="mant-item"><div><div class="mant-item-nombre">${d.n}${d.d?' — '+d.d:''}</div><div class="mant-item-sub">RUT: ${d.r||'—'} | ${d.t||'—'}</div></div><div style="display:flex;gap:6px"><button class="btn-edit" onclick="modalEditC(${idx})">Editar</button><button class="btn-rm" onclick="delCli(${idx})" title="Eliminar">🗑</button></div></div>`;
+        return`<div class="mant-item"><div><div class="mant-item-nombre">${d.l}</div><div class="mant-item-sub">Marca: ${d.m||'—'} | Modelo: ${d.o||'—'} | Serie: ${d.s||'—'}${d.da?' | Data: '+d.da:''}${d.ba?' | Baja: '+d.ba:''}</div></div><div style="display:flex;gap:6px"><button class="btn-edit" onclick="modalEditE(${idx})">Editar</button><button class="btn-rm" onclick="delEqu(${idx})" title="Eliminar">🗑</button></div></div>`;
       }).join('')}
     </div>
   </div>`;}
 
+function delCli(idx){if(!confirm('¿Eliminar cliente "'+(CLIENTES[idx]?.n||'')+'"?'))return;CLIENTES.splice(idx,1);persist();toast('Cliente eliminado','ok');renderMant();}
+function delEqu(idx){if(!confirm('¿Eliminar equipo "'+(EQUIPOS[idx]?.l||'')+'"?'))return;EQUIPOS.splice(idx,1);persist();toast('Equipo eliminado','ok');renderMant();}
 function modalAgregar(){
   if(mantTab==='clientes'){
     openModal(`<h3>Nuevo Cliente</h3>
