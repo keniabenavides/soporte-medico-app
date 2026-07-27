@@ -1073,7 +1073,7 @@ function pngToJpegWhite(dataUrl,enhance=false){
         ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);
         if(enhance)ctx.filter='contrast(1.6) saturate(1.25)';
         ctx.drawImage(img,0,0,cv.width,cv.height);
-        resolve(cv.toDataURL('image/jpeg',0.95));
+        resolve(cv.toDataURL('image/jpeg',1));
       }catch(e){resolve(dataUrl);}
     };
     img.onload=proc;
@@ -1157,8 +1157,8 @@ async function guardar(){
     try{
       pdfBlob=await html2pdf().set({
         margin:[6,6,6,6],filename:`${LABEL_A[doc.tipo]} N°${num}.pdf`,
-        image:{type:'jpeg',quality:0.95},
-        html2canvas:{scale:2,useCORS:true,logging:false,scrollY:0,scrollX:0},
+        image:{type:'jpeg',quality:1},
+        html2canvas:{scale:3,useCORS:true,logging:false,scrollY:0,scrollX:0},
         jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
         pagebreak:{mode:['css','legacy']}
       }).from(el).outputPdf('blob');
