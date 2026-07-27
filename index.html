@@ -293,12 +293,16 @@ async function refreshAccessToken(){
   })();
   try{return await _refreshInFlight;}finally{_refreshInFlight=null;}
 }
+let _authModalInFlight=null;
 async function ensureFreshToken(){
   const t=tokenVigente();if(t)return t;
   // Token ausente o vencido: renovar en silencio con el refresh token (sin pedir nada al usuario)
   const refreshed=await refreshAccessToken();if(refreshed)return refreshed;
-  // Solo si NUNCA se ha conectado Dropbox (no hay refresh token) se pide autorización manual
-  return new Promise(resolve=>{
+  // Si ya hay un modal de autorización abierto (p.ej. guardar() y guardarEnExcel() piden token
+  // casi al mismo tiempo), reutilizar esa misma promesa en vez de abrir un segundo modal que
+  // pisaría window._pkceResolve y dejaría la primera llamada esperando para siempre.
+  if(_authModalInFlight)return _authModalInFlight;
+  _authModalInFlight=new Promise(resolve=>{
     const cv=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
     // 'state' identifica este intento en particular: si hay varias pestañas de la app abiertas
     // e intentan conectar Dropbox al mismo tiempo, cada una guarda su propio code_verifier bajo
@@ -310,10 +314,14 @@ async function ensureFreshToken(){
       const cc=btoa(String.fromCharCode(...new Uint8Array(h))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
       const redirect=location.href.split('?')[0].split('#')[0];
       const url=`https://www.dropbox.com/oauth2/authorize?client_id=${DBX_APP_KEY}&response_type=code&code_challenge=${cc}&code_challenge_method=S256&redirect_uri=${encodeURIComponent(redirect)}&token_access_type=offline&state=${state}`;
-      openModal(`<h3>Conectar con Dropbox</h3><p style="font-size:13px;margin-bottom:12px">Para guardar en Dropbox debes autorizar la app. Se abrirá Dropbox en una nueva pestaña — autoriza y luego pega aquí el código que te entrega.</p><button class="btn-pri" style="width:100%;margin-bottom:10px" onclick="window.open('${url}','_blank')">🔗 Abrir Dropbox para autorizar</button><div class="campo"><label>Pega el código aquí</label><input type="text" id="pkceCode" placeholder="Código de autorización..."></div><button class="btn-pri" style="width:100%;margin-top:8px" onclick="pkceExchange()">✅ Confirmar</button><button class="btn-cancel" onclick="closeModal();resolve(null)">Cancelar</button>`);
+      openModal(`<h3>Conectar con Dropbox</h3><p style="font-size:13px;margin-bottom:12px">Para guardar en Dropbox debes autorizar la app. Se abrirá Dropbox en una nueva pestaña — autoriza y luego pega aquí el código que te entrega.</p><button class="btn-pri" style="width:100%;margin-bottom:10px" onclick="window.open('${url}','_blank')">🔗 Abrir Dropbox para autorizar</button><div class="campo"><label>Pega el código aquí</label><input type="text" id="pkceCode" placeholder="Código de autorización..."></div><button class="btn-pri" style="width:100%;margin-top:8px" onclick="pkceExchange()">✅ Confirmar</button><button class="btn-cancel" onclick="closeModal();cancelarConexionDropbox()">Cancelar</button>`);
       window._pkceResolve=resolve;
     });
-  });
+  }).finally(()=>{_authModalInFlight=null;});
+  return _authModalInFlight;
+}
+function cancelarConexionDropbox(){
+  if(window._pkceResolve){window._pkceResolve(null);window._pkceResolve=null;}
 }
 async function pkceExchange(){
   const code=document.getElementById('pkceCode')?.value.trim();
