@@ -283,8 +283,8 @@ async function refreshAccessToken(){
     try{
       const r=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
         method:'POST',
-        headers:{'Content-Type':'application/json','X-Dropbox-URL':'https://api.dropbox.com/oauth2/token'},
-        body:JSON.stringify({grant_type:'refresh_token',refresh_token:rt,client_id:DBX_APP_KEY})
+        headers:{'Content-Type':'application/x-www-form-urlencoded','X-Dropbox-URL':'https://api.dropbox.com/oauth2/token'},
+        body:new URLSearchParams({grant_type:'refresh_token',refresh_token:rt,client_id:DBX_APP_KEY})
       });
       const d=await r.json();
       if(d.access_token){guardarToken(d.access_token,d.expires_in);return d.access_token;}
@@ -305,16 +305,11 @@ async function ensureFreshToken(){
   if(_authModalInFlight)return _authModalInFlight;
   _authModalInFlight=new Promise(resolve=>{
     const cv=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
-    // 'state' identifica este intento en particular: si hay varias pestañas de la app abiertas
-    // e intentan conectar Dropbox al mismo tiempo, cada una guarda su propio code_verifier bajo
-    // su propio 'state' en vez de pisarse unas a otras en la misma llave de localStorage.
-    const state=Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>b.toString(16).padStart(2,'0')).join('');
-    localStorage.setItem('pkce_cv_'+state,cv);
-    localStorage.setItem('pkce_cv',cv); // compatibilidad con intentos antiguos
+    localStorage.setItem('pkce_cv',cv);
     crypto.subtle.digest('SHA-256',new TextEncoder().encode(cv)).then(h=>{
       const cc=btoa(String.fromCharCode(...new Uint8Array(h))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
       const redirect=location.href.split('?')[0].split('#')[0];
-      const url=`https://www.dropbox.com/oauth2/authorize?client_id=${DBX_APP_KEY}&response_type=code&code_challenge=${cc}&code_challenge_method=S256&redirect_uri=${encodeURIComponent(redirect)}&token_access_type=offline&state=${state}`;
+      const url=`https://www.dropbox.com/oauth2/authorize?client_id=${DBX_APP_KEY}&response_type=code&code_challenge=${cc}&code_challenge_method=S256&redirect_uri=${encodeURIComponent(redirect)}&token_access_type=offline`;
       openModal(`<h3>Conectar con Dropbox</h3><p style="font-size:13px;margin-bottom:12px">Para guardar en Dropbox debes autorizar la app. Se te llevará a Dropbox en esta misma pestaña — autoriza y volverás automáticamente aquí, sin necesidad de copiar ningún código.</p><button class="btn-pri" style="width:100%;margin-bottom:10px" onclick="location.href='${url}'">🔗 Ir a Dropbox para autorizar</button><details style="margin-top:4px"><summary style="font-size:12px;color:var(--txs);cursor:pointer">¿No te redirigió automáticamente? Pega el código aquí</summary><div class="campo" style="margin-top:8px"><input type="text" id="pkceCode" placeholder="Código de autorización..."></div><button class="btn-pri" style="width:100%;margin-top:8px" onclick="pkceExchange()">✅ Confirmar</button></details><button class="btn-cancel" style="margin-top:10px" onclick="closeModal();cancelarConexionDropbox()">Cancelar</button>`);
       window._pkceResolve=resolve;
     });
@@ -337,8 +332,8 @@ async function _exchangeCode(code,silent,cvOverride){
   try{
     const r=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
       method:'POST',
-      headers:{'Content-Type':'application/json','X-Dropbox-URL':'https://api.dropbox.com/oauth2/token'},
-      body:JSON.stringify({code,grant_type:'authorization_code',client_id:DBX_APP_KEY,code_verifier:cv,redirect_uri:redirect})
+      headers:{'Content-Type':'application/x-www-form-urlencoded','X-Dropbox-URL':'https://api.dropbox.com/oauth2/token'},
+      body:new URLSearchParams({code,grant_type:'authorization_code',client_id:DBX_APP_KEY,code_verifier:cv,redirect_uri:redirect})
     });
     const d=await r.json();
     if(d.access_token){
@@ -355,19 +350,15 @@ async function _exchangeCode(code,silent,cvOverride){
   }catch(e){console.error('Dropbox OAuth exchange fetch error:',e);toast('Error de conexión con Dropbox','err');}
   return null;
 }
-// Al volver de Dropbox, la propia página recibe ?code=... y &state=... en la URL
-// (redirect_uri = la misma app). Se procesa automáticamente sin pedirle nada al usuario.
+// Al volver de Dropbox, la propia página recibe ?code=... en la URL (redirect_uri = la misma app).
+// Se procesa automáticamente sin pedirle nada al usuario.
 async function _handleOAuthCallback(){
   const params=new URLSearchParams(location.search);
   const code=params.get('code');
   if(!code)return false;
-  const state=params.get('state');
-  // Usa el code_verifier guardado específicamente para este 'state' (evita choques entre pestañas);
-  // si no hay state (enlace viejo) cae al genérico.
-  const cv=(state&&localStorage.getItem('pkce_cv_'+state))||localStorage.getItem('pkce_cv');
-  history.replaceState({},'',location.pathname); // limpia ?code=/&state= de la barra de direcciones
+  const cv=localStorage.getItem('pkce_cv');
+  history.replaceState({},'',location.pathname); // limpia el ?code= de la barra de direcciones
   const tok=await _exchangeCode(code,true,cv);
-  if(state)localStorage.removeItem('pkce_cv_'+state);
   // El navegador recargó la página al volver de Dropbox, así que cualquier acción que se estaba
   // haciendo antes (ej. Guardar) se perdió — avisamos para que la repita.
   if(tok)toast('✅ Dropbox conectado. Ya puedes volver a intentar Guardar.','ok');
