@@ -288,7 +288,8 @@ async function refreshAccessToken(){
       });
       const d=await r.json();
       if(d.access_token){guardarToken(d.access_token,d.expires_in);return d.access_token;}
-    }catch(e){}
+      console.error('Dropbox refresh_token falló:',d.error,d.error_description||'');
+    }catch(e){console.error('Dropbox refresh_token error de red:',e.message);}
     return null;
   })();
   try{return await _refreshInFlight;}finally{_refreshInFlight=null;}
