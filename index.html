@@ -135,7 +135,7 @@ button{cursor:pointer;font-family:inherit}
 .doc-monto-val{font-weight:600;text-align:right}
 /* Checklist doc */
 .chk-doc-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:10px}
-.chk-doc-row{display:flex;align-items:flex-start;gap:5px;padding:4px 8px;border-radius:3px;font-size:11px;line-height:1.4;border:1px solid transparent}
+.chk-doc-row{display:flex;align-items:flex-start;gap:5px;padding:5px 10px;border-radius:3px;font-size:12px;line-height:1.4;border:1px solid transparent}
 .chk-doc-row.ok{background:#e8f5ee;border-color:#c3e6cb}
 .chk-doc-row.no{background:#f4f6f8;border-color:var(--grb);color:var(--txs)}
 /* Tabla resumen mantención */
@@ -892,14 +892,9 @@ function renderChecklistDoc(cl,secCls,tipo,tec){
   const resTblCls=isCG?'cg':'';
 
   const chkTable=(items,titulo)=>{
-    const rows=[];
-    for(let i=0;i<items.length;i+=2){
-      const a=items[i],b=items[i+1];
-      rows.push(`<tr style="break-inside:avoid;page-break-inside:avoid">
-        <td class="chk-doc-row ${a.ok?'ok':'no'}" style="width:50%">${a.ok?'☑':'☐'} ${a.item}</td>
-        <td class="chk-doc-row ${b?b.ok?'ok':'no':''}" style="width:50%">${b?(b.ok?'☑':'☐')+' '+b.item:''}</td>
-      </tr>`);
-    }
+    const rows=items.map(c=>`<tr style="break-inside:avoid;page-break-inside:avoid">
+      <td class="chk-doc-row ${c.ok?'ok':'no'}" style="width:100%;font-size:12px;padding:5px 10px">${c.ok?'☑':'☐'} ${c.item}</td>
+    </tr>`);
     return `<div class="doc-sec ${secCls}" style="break-after:avoid;page-break-after:avoid">${titulo}</div>
     <table style="width:100%;border-collapse:collapse;margin-bottom:10px"><tbody>${rows.join('')}</tbody></table>`;
   };
