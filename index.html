@@ -1487,11 +1487,17 @@ function modalDropbox(){const t=getToken();const hasRefresh=!!localStorage.getIt
     ${t?`<button type="button" style="width:100%;margin-top:8px;background:none;border:1.5px solid var(--ro);border-radius:10px;padding:10px;font-size:13px;color:var(--ro)" onclick="localStorage.removeItem('dbx_token');localStorage.removeItem('dbx_token_exp');localStorage.removeItem('dbx_refresh');closeModal();toast('Token eliminado')">🗑 Desconectar Dropbox</button>`:''}
     <button class="btn-cancel" onclick="closeModal()">Cancelar</button>`);}
 async function testDropbox(){
-  const t=document.getElementById('mTok')?.value.trim()||getToken();
+  const fieldVal=document.getElementById('mTok')?.value.trim();
+  // El campo viene prellenado con el token guardado; solo se considera "manual" si el usuario lo cambió
+  const manual=(fieldVal&&fieldVal!==getToken())?fieldVal:null;
   const res=document.getElementById('dbxTestResult');
   if(!res)return;
-  if(!t){res.style.display='block';res.style.color='var(--ro)';res.textContent='⚠️ Ingresa el token primero';return;}
   res.style.display='block';res.style.color='var(--txs)';res.textContent='Probando conexión...';
+  // Si el usuario escribió un token manual distinto, probar exactamente ese valor.
+  // Si no, usar ensureFreshToken() para que intente renovar en silencio antes de probar
+  // (evita falsos "expirado" cuando el sistema puede autorenovarse solo).
+  const t=manual||await ensureFreshToken();
+  if(!t){res.style.color='var(--ro)';res.textContent='⚠️ No hay token disponible — conecta Dropbox primero';return;}
   try{
     const r=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
       method:'POST',
@@ -1502,9 +1508,12 @@ async function testDropbox(){
       const d=await r.json();
       res.style.color='var(--ve)';
       res.textContent='✅ Conexión OK — Cuenta: '+(d.name?.display_name||d.email||'OK');
+      const mTok=document.getElementById('mTok');if(mTok&&!manual)mTok.value=t;
     } else if(r.status===401){
       res.style.color='var(--ro)';
-      res.innerHTML='❌ Token inválido o expirado (401).<br><strong>Solución:</strong> Ve a dropbox.com/developers/apps → tu app → Settings → OAuth 2 → cambia a <strong>"No expiration"</strong> → Generate → copia el nuevo token aquí.';
+      res.innerHTML=manual
+        ?'❌ Ese token manual es inválido o expiró. Pégalo de nuevo o usa "Conectar con Dropbox" arriba para autorización automática.'
+        :'❌ La sesión expiró y no se pudo renovar automáticamente.<br><strong>Solución:</strong> Haz clic en "🔗 Conectar con Dropbox" para reautorizar (una sola vez).';
     } else {
       const e=await r.json().catch(()=>({}));
       res.style.color='var(--ro)';
