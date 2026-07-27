@@ -81,7 +81,6 @@ button{cursor:pointer;font-family:inherit}
 .doc-hdr.cg{border-bottom-color:var(--tl)}
 .doc-hdr-logo{flex-shrink:0;padding:4px 0}
 .doc-hdr-logo img{height:79px;max-width:230px;object-fit:contain;display:block}
-.doc-hdr.cg .doc-hdr-logo img{height:99px;max-width:288px}
 .doc-hdr-empresa{flex:1;padding:0 14px}
 .doc-hdr-empresa .nombre{font-size:16px;font-weight:700;letter-spacing:.2px;color:var(--az)}
 .doc-hdr-empresa.cg .nombre{color:var(--tl)}
@@ -845,8 +844,8 @@ function renderPreview(doc){
           <div class="firma-bloque">
             <div class="firma-tec-wrap">
               <div style="display:flex;align-items:center;justify-content:center;gap:16px;background:#fff;padding:4px;border-radius:4px">
-                <img style="max-height:138px;max-width:300px;object-fit:contain;background:#fff;filter:contrast(1.4) brightness(0.82) saturate(1.15)" src="${firma}" alt="Firma">
-                <img style="max-height:70px;max-width:154px;object-fit:contain;background:#fff;filter:contrast(1.4) brightness(0.82) saturate(1.15)" src="${timbre}" alt="Timbre">
+                <img style="max-height:138px;max-width:300px;object-fit:contain;filter:contrast(1.6) saturate(1.25)" src="${firma}" alt="Firma">
+                <img style="max-height:70px;max-width:154px;object-fit:contain;filter:contrast(1.6) saturate(1.25)" src="${timbre}" alt="Timbre">
               </div>
             </div>
             <div class="firma-linea"></div>
@@ -953,7 +952,7 @@ function initFirma(){
     return e.touches?[(e.touches[0].clientX-r.left)*sx,(e.touches[0].clientY-r.top)*sy]:[(e.clientX-r.left)*sx,(e.clientY-r.top)*sy];}
   function start(e){e.preventDefault();draw=true;[lx,ly]=pos(e);}
   function move(e){if(!draw)return;e.preventDefault();const[x,y]=pos(e);
-    ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(x,y);ctx.strokeStyle='#1a3a5c';ctx.lineWidth=1.5;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();[lx,ly]=[x,y];}
+    ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(x,y);ctx.strokeStyle='#000';ctx.lineWidth=1.1;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();[lx,ly]=[x,y];}
   function end(){draw=false;firmaData=cv.toDataURL('image/png');}
   cv.addEventListener('mousedown',start);cv.addEventListener('mousemove',move);cv.addEventListener('mouseup',end);
   cv.addEventListener('touchstart',start,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',end);
@@ -975,12 +974,11 @@ function pngToJpegWhite(dataUrl,enhance=false){
       try{
         const w=img.naturalWidth||img.width||300;
         const h=img.naturalHeight||img.height||120;
-        const sc=enhance?2:1;
-        const cv=document.createElement('canvas');cv.width=w*sc;cv.height=h*sc;
+        // Resolución natural (sin reescalar, evita borrosidad); contraste puro mantiene el blanco blanco
+        const cv=document.createElement('canvas');cv.width=w;cv.height=h;
         const ctx=cv.getContext('2d');
         ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);
-        ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
-        if(enhance)ctx.filter='contrast(1.4) brightness(0.82) saturate(1.15)';
+        if(enhance)ctx.filter='contrast(1.6) saturate(1.25)';
         ctx.drawImage(img,0,0,cv.width,cv.height);
         resolve(cv.toDataURL('image/jpeg',0.95));
       }catch(e){resolve(dataUrl);}
