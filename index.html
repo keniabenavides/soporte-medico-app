@@ -951,15 +951,23 @@ function hideProg(){document.getElementById('prog').classList.add('off');}
 // Convierte data URL de PNG a JPEG con fondo blanco (elimina transparencia que html2canvas renderiza como negro)
 function pngToJpegWhite(dataUrl){
   return new Promise(resolve=>{
-    if(!dataUrl||!dataUrl.startsWith('data:image/png')){resolve(dataUrl);return;}
+    if(!dataUrl||(!dataUrl.startsWith('data:image/png')&&!dataUrl.startsWith('data:image'))){resolve(dataUrl);return;}
     const img=new Image();
     img.onload=()=>{
-      const cv=document.createElement('canvas');cv.width=img.width||300;cv.height=img.height||120;
-      const ctx=cv.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);
-      ctx.drawImage(img,0,0);resolve(cv.toDataURL('image/jpeg',0.95));
+      const w=img.naturalWidth||img.width||300;
+      const h=img.naturalHeight||img.height||120;
+      const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+      const ctx=cv.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,w,h);
+      ctx.drawImage(img,0,0,w,h);resolve(cv.toDataURL('image/jpeg',0.95));
     };
     img.onerror=()=>resolve(dataUrl);
     img.src=dataUrl;
+    if(img.complete&&img.naturalWidth){
+      const w=img.naturalWidth;const h=img.naturalHeight;
+      const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+      const ctx=cv.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,w,h);
+      ctx.drawImage(img,0,0,w,h);resolve(cv.toDataURL('image/jpeg',0.95));
+    }
   });
 }
 
@@ -1012,17 +1020,11 @@ async function guardar(){
     await Promise.all(allImgs.map(async i=>{i.src=await pngToJpegWhite(i.src);}));
 
     let pdfBlob;
+    // windowWidth=780 iguala el max-width del doc-wrap, así margin:auto queda en 0px y no hay corte a la izquierda
     pdfBlob=await html2pdf().set({
       margin:[6,6,6,6],filename:`${LABEL_A[doc.tipo]} N°${num}.pdf`,
       image:{type:'jpeg',quality:0.95},
-      html2canvas:{
-        scale:2,useCORS:true,logging:false,scrollY:0,scrollX:0,
-        windowWidth:800,backgroundColor:'#ffffff',
-        onclone:(clonedDoc)=>{
-          const wrap=clonedDoc.getElementById('docPDF');
-          if(wrap){wrap.style.margin='0';wrap.style.maxWidth='none';wrap.style.width='788px';}
-        }
-      },
+      html2canvas:{scale:2,useCORS:true,logging:false,scrollY:0,scrollX:0,windowWidth:780,backgroundColor:'#ffffff'},
       jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
       pagebreak:{mode:['css','legacy']}
     }).from(el).outputPdf('blob');
@@ -1040,7 +1042,7 @@ async function guardar(){
     const lblArch=normPath(LABEL_A[doc.tipo]);
     const carpeta=`${fechaFmt} ${lblArch} N°${num}`;
     const archivo=`${lblArch} N°${num}.pdf`;
-    const ruta=`/Soporte Medico/${nomCli}/${anio}/${nombreMes}/${carpeta}/${archivo}`;
+    const ruta=`/Soporte Medico/Clientes/${nomCli}/${anio}/${nombreMes}/${carpeta}/${archivo}`;
     const rutaArg=dbxArg({path:ruta,mode:'overwrite',autorename:true,mute:false});
 
     const buf=await pdfBlob.arrayBuffer();
