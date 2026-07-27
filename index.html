@@ -832,9 +832,9 @@ function renderPreview(doc){
           <div class="firma-bloque">
             <div class="firma-tec-wrap">
               <div class="firma-nombre-bold" style="font-size:12px;font-weight:700;text-align:center;text-transform:uppercase;margin-bottom:6px">${tec}</div>
-              <div style="display:flex;align-items:center;justify-content:center;gap:12px">
-                <img style="max-height:55px;max-width:120px;object-fit:contain;object-fit:contain" src="${firma}" alt="Firma">
-                <img style="max-height:50px;max-width:110px;object-fit:contain;object-fit:contain" src="${timbre}" alt="Timbre">
+              <div style="display:flex;align-items:center;justify-content:center;gap:12px;background:#fff;padding:4px;border-radius:4px">
+                <img style="max-height:55px;max-width:120px;object-fit:contain;background:#fff" src="${firma}" alt="Firma">
+                <img style="max-height:50px;max-width:110px;object-fit:contain;background:#fff" src="${timbre}" alt="Timbre">
               </div>
             </div>
             <div class="firma-linea"></div>
@@ -985,13 +985,22 @@ async function guardar(){
     window.scrollTo(0,0);
     await new Promise(r=>setTimeout(r,200));
     const el=document.getElementById('docPDF');
-    const pdfBlob=await html2pdf().set({
-      margin:[6,6,6,6],filename:`${LABEL_A[doc.tipo]} N°${num}.pdf`,
-      image:{type:'jpeg',quality:0.95},
-      html2canvas:{scale:2,useCORS:true,logging:false,scrollY:0,scrollX:0,windowWidth:1000,backgroundColor:'#ffffff'},
-      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
-      pagebreak:{mode:['css','legacy']}
-    }).from(el).outputPdf('blob');
+    // Temporarily remove centering margin so html2canvas captures from x=0
+    const prevMargin=el.style.margin;const prevMaxW=el.style.maxWidth;const prevW=el.style.width;
+    el.style.margin='0';el.style.maxWidth='none';el.style.width='780px';
+    await new Promise(r=>setTimeout(r,100));
+    let pdfBlob;
+    try{
+      pdfBlob=await html2pdf().set({
+        margin:[6,6,6,6],filename:`${LABEL_A[doc.tipo]} N°${num}.pdf`,
+        image:{type:'jpeg',quality:0.95},
+        html2canvas:{scale:2,useCORS:true,logging:false,scrollY:0,scrollX:0,windowWidth:792,backgroundColor:'#ffffff'},
+        jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+        pagebreak:{mode:['css','legacy']}
+      }).from(el).outputPdf('blob');
+    }finally{
+      el.style.margin=prevMargin;el.style.maxWidth=prevMaxW;el.style.width=prevW;
+    }
 
     showProg('Subiendo a Dropbox...','Creando carpetas automáticamente');
 
