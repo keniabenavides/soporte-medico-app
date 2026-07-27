@@ -68,7 +68,7 @@ button{cursor:pointer;font-family:inherit}
 .btn-pri:hover{background:var(--azc)}.btn-pri:disabled{background:#888;cursor:not-allowed}
 .btn-sec{background:#fff;color:var(--az);border:1.5px solid var(--az);border-radius:10px;padding:14px;font-size:15px;font-weight:600}
 /* PREVIEW */
-.preview-page{padding:0}
+.preview-page{padding:0;overflow-x:auto}
 .prev-toolbar{background:#fff;padding:12px 20px;display:flex;gap:10px;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,.08);position:sticky;top:60px;z-index:50;flex-wrap:wrap}
 .btn-guardar{background:var(--ve);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:600}
 .btn-guardar:disabled{background:#888;cursor:not-allowed}
@@ -88,7 +88,7 @@ button{cursor:pointer;font-family:inherit}
 .doc-hdr-numbox{background:var(--az);border-radius:6px;padding:12px 20px;text-align:right;flex-shrink:0;min-width:185px}
 .doc-hdr-numbox.cg{background:var(--tl)}
 .doc-hdr-numbox .tipo{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#fff}
-.doc-hdr-numbox .num{font-size:30px;font-weight:800;line-height:1.1;color:#fff}
+.doc-hdr-numbox .num{font-size:20px;font-weight:800;line-height:1.1;color:#fff}
 .doc-hdr-numbox .fecha{font-size:13px;margin-top:3px;color:#fff}
 /* Título tipo — fondo sólido como secciones */
 .doc-tipo-bar{text-align:center;padding:8px 10px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#fff}
@@ -832,8 +832,8 @@ function renderPreview(doc){
           <div class="firma-bloque">
             <div class="firma-tec-wrap">
               <div style="display:flex;align-items:center;justify-content:center;gap:16px;background:#fff;padding:4px;border-radius:4px">
-                <img style="max-height:110px;max-width:240px;object-fit:contain;background:#fff" src="${firma}" alt="Firma">
-                <img style="max-height:100px;max-width:220px;object-fit:contain;background:#fff" src="${timbre}" alt="Timbre">
+                <img style="max-height:138px;max-width:300px;object-fit:contain;background:#fff" src="${firma}" alt="Firma">
+                <img style="max-height:70px;max-width:154px;object-fit:contain;background:#fff" src="${timbre}" alt="Timbre">
               </div>
             </div>
             <div class="firma-linea"></div>
@@ -1016,7 +1016,7 @@ async function guardar(){
       });
       if(dlResp.ok){
         const xlsxBuf=await dlResp.arrayBuffer();
-        preloadedWb=XLSX.read(new Uint8Array(xlsxBuf),{type:'array',cellDates:true,bookVBA:true});
+        preloadedWb=XLSX.read(new Uint8Array(xlsxBuf),{type:'array',cellDates:true,bookVBA:true,cellStyles:true});
         const sn=getSheetName(doc.tipo);
         if(preloadedWb.SheetNames.includes(sn)){
           const ws=preloadedWb.Sheets[sn];
@@ -1054,10 +1054,16 @@ async function guardar(){
       pdfBlob=await html2pdf().set({
         margin:[6,6,6,6],filename:`${LABEL_A[doc.tipo]} N°${num}.pdf`,
         image:{type:'jpeg',quality:0.95},
-        html2canvas:{scale:2,useCORS:true,logging:false,scrollY:0,scrollX:0,windowWidth:780,backgroundColor:'#ffffff',
+        html2canvas:{scale:2,useCORS:true,logging:false,scrollY:0,scrollX:0,windowWidth:794,backgroundColor:'#ffffff',
           onclone:(clonedDoc)=>{
             const ce=clonedDoc.getElementById('docPDF');
-            if(ce){ce.style.margin='0';ce.style.maxWidth='none';ce.style.width='780px';ce.style.boxShadow='none';ce.style.position='static';}
+            if(ce){
+              ce.style.margin='0';ce.style.maxWidth='none';ce.style.width='780px';ce.style.boxShadow='none';ce.style.position='static';ce.style.left='0';ce.style.top='0';
+              // Zero out all ancestor padding/margin so element starts at page left
+              let p=ce.parentElement;
+              while(p&&p!==clonedDoc.body){p.style.margin='0';p.style.padding='0';p.style.width='780px';p=p.parentElement;}
+              if(clonedDoc.body){clonedDoc.body.style.margin='0';clonedDoc.body.style.padding='0';}
+            }
           }
         },
         jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
@@ -1149,7 +1155,7 @@ async function guardarEnExcel(doc,num,preloadedWb=null){
       });
       if(!dlResp.ok){console.warn('No se pudo descargar el Excel BD');return;}
       const xlsxBuf=await dlResp.arrayBuffer();
-      wb=XLSX.read(new Uint8Array(xlsxBuf),{type:'array',cellDates:true,bookVBA:true});
+      wb=XLSX.read(new Uint8Array(xlsxBuf),{type:'array',cellDates:true,bookVBA:true,cellStyles:true});
     }
     const tipo=doc.tipo;
     const cli=doc.cliente;
@@ -1193,7 +1199,7 @@ async function guardarEnExcel(doc,num,preloadedWb=null){
     XLSX.utils.sheet_add_aoa(ws,[newRow],{origin:-1});
 
     // Subir Excel modificado (bookVBA:true preserva macros y formato)
-    const outBuf=XLSX.write(wb,{type:'array',bookType:'xlsm',bookVBA:true});
+    const outBuf=XLSX.write(wb,{type:'array',bookType:'xlsm',bookVBA:true,cellStyles:true});
     const upResp=await fetch('https://dropbox-proxy.kenia-benavides.workers.dev',{
       method:'POST',
       headers:{
