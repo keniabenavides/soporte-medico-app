@@ -314,7 +314,7 @@ function getLogo(tipo,tec){return(esCG(tipo)||tecnicoEsCG(tec))?IMG.logo_cg:IMG.
 function getFirmaTimbre(tec){return tecnicoEsCG(tec)?{firma:IMG.firma_t,timbre:IMG.timbre_cg}:{firma:IMG.firma_t,timbre:IMG.timbre_sm};}
 function getEmpresa(tipo,tec){return(esCG(tipo)||tecnicoEsCG(tec))?E_CG:E_SM;}
 function getHdrCls(tipo,tec){return(esCG(tipo)||tecnicoEsCG(tec))?'cg':'sm';}
-function getSecCls(tipo,tec){return esMant(tipo)?'mant':(esCG(tipo)||tecnicoEsCG(tec))?'cg':'sm';}
+function getSecCls(tipo,tec){return(esCG(tipo)||tecnicoEsCG(tec))?'cg':'sm';}
 
 const NOMBRES={
   cot_sm:'Cotización Servicio Técnico',inf_sm:'Informe Servicio Técnico',
