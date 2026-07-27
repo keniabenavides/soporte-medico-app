@@ -313,6 +313,11 @@ async function ensureFreshToken(){
 async function pkceExchange(){
   const code=document.getElementById('pkceCode')?.value.trim();
   if(!code){toast('Pega el código primero','err');return;}
+  await _exchangeCode(code);
+}
+// Intercambia el código de autorización por tokens. Se usa tanto desde el modal (código pegado
+// a mano) como automáticamente cuando Dropbox redirige de vuelta con ?code=... en la URL.
+async function _exchangeCode(code,silent){
   const cv=localStorage.getItem('pkce_cv');
   const redirect=location.href.split('?')[0].split('#')[0];
   try{
@@ -325,10 +330,27 @@ async function pkceExchange(){
     if(d.access_token){
       guardarToken(d.access_token,d.expires_in);
       if(d.refresh_token)localStorage.setItem('dbx_refresh',d.refresh_token);
-      closeModal();toast('✅ Dropbox conectado');
+      closeModal();
+      if(!silent)toast('✅ Dropbox conectado');
       if(window._pkceResolve){window._pkceResolve(d.access_token);window._pkceResolve=null;}
-    } else {toast('Error: '+(d.error_description||d.error||'desconocido'),'err');}
-  }catch(e){toast('Error de conexión','err');}
+      return d.access_token;
+    } else if(!silent){toast('Error: '+(d.error_description||d.error||'desconocido'),'err');}
+  }catch(e){if(!silent)toast('Error de conexión','err');}
+  return null;
+}
+// Al volver de Dropbox, la propia página recibe ?code=... en la URL (redirect_uri = la misma app).
+// Se procesa automáticamente sin pedirle al usuario que copie/pegue nada.
+async function _handleOAuthCallback(){
+  const params=new URLSearchParams(location.search);
+  const code=params.get('code');
+  if(!code)return false;
+  history.replaceState({},'',location.pathname); // limpia el ?code= de la barra de direcciones
+  const tok=await _exchangeCode(code,true);
+  // El navegador recargó la página al volver de Dropbox, así que cualquier acción que se estaba
+  // haciendo antes (ej. Guardar) se perdió — avisamos para que la repita.
+  if(tok)toast('✅ Dropbox conectado. Ya puedes volver a intentar Guardar.','ok');
+  else toast('❌ No se pudo conectar Dropbox, intenta de nuevo','err');
+  return !!tok;
 }
 
 // ══ HELPERS ══
@@ -1536,11 +1558,22 @@ function closeModal(){document.getElementById('modalBg').classList.add('off');}
 document.getElementById('modalBg').addEventListener('click',e=>{if(e.target===document.getElementById('modalBg'))closeModal();});
 function toast(msg,tipo){const el=document.getElementById('toast');el.textContent=msg;el.className='toast vis'+(tipo?' '+tipo:'');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('vis'),3500);}
 
+// Si "Abrir Dropbox para autorizar" abrió una pestaña nueva, la autorización se completa AHÍ
+// (redirect_uri = la misma app) y guarda el token en localStorage. Esta pestaña original, que
+// quedó con el modal esperando, se entera vía el evento 'storage' y se resuelve sola.
+window.addEventListener('storage',e=>{
+  if(e.key==='dbx_token'&&e.newValue&&window._pkceResolve){
+    closeModal();
+    toast('✅ Dropbox conectado','ok');
+    window._pkceResolve(e.newValue);window._pkceResolve=null;
+  }
+});
+
 // ══ INIT ══
 const _c=localStorage.getItem('cli');if(_c)CLIENTES=JSON.parse(_c);
 const _e=localStorage.getItem('equ');if(_e)EQUIPOS=JSON.parse(_e);
 renderInicio();
-loadCliEqu().then(()=>{if(document.getElementById('pgInicio').style.display!=='none')renderInicio();});
+_handleOAuthCallback().then(()=>loadCliEqu()).then(()=>{if(document.getElementById('pgInicio').style.display!=='none')renderInicio();});
 </script>
 </body>
 </html>
