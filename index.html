@@ -301,8 +301,8 @@ function fmtF(s){if(!s)return'—';if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return s;va
 function fmtP(n){return'$ '+Math.round(n||0).toLocaleString('es-CL');}
 function san(s){return(s||'').replace(/[/\\:*?"<>|]/g,'-').trim();}
 function normPath(s){
-  // Elimina tildes y caracteres especiales para rutas Dropbox
-  return(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[/\\\\:*?"<>|]/g,'-').trim();
+  // Solo elimina caracteres inv\u00e1lidos en rutas de archivo; mantiene tildes (Dropbox los soporta)
+  return(s||'').replace(/[/\\:*?"<>|]/g,'-').trim();
 }
 function esCot(t){return t==='cot_sm'||t==='cot_cg';}
 function esMant(t){return t.startsWith('mant_');}
@@ -948,11 +948,32 @@ function limpiarFirma(){const cv=document.getElementById('firmaCanvas');if(cv){c
 function showProg(m,s){document.getElementById('progMsg').textContent=m||'';document.getElementById('progSub').textContent=s||'';document.getElementById('prog').classList.remove('off');}
 function hideProg(){document.getElementById('prog').classList.add('off');}
 
+// Convierte data URL de PNG a JPEG con fondo blanco (elimina transparencia que html2canvas renderiza como negro)
+function pngToJpegWhite(dataUrl){
+  return new Promise(resolve=>{
+    if(!dataUrl||!dataUrl.startsWith('data:image/png')){resolve(dataUrl);return;}
+    const img=new Image();
+    img.onload=()=>{
+      const cv=document.createElement('canvas');cv.width=img.width||300;cv.height=img.height||120;
+      const ctx=cv.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);
+      ctx.drawImage(img,0,0);resolve(cv.toDataURL('image/jpeg',0.95));
+    };
+    img.onerror=()=>resolve(dataUrl);
+    img.src=dataUrl;
+  });
+}
+
 async function guardar(){
   const tok=await ensureFreshToken();
   if(!tok){toast('Se necesita autorización de Dropbox','err');return;}
 
-  const cv=document.getElementById('firmaCanvas');if(cv)firmaData=cv.toDataURL('image/png');
+  const cv=document.getElementById('firmaCanvas');
+  if(cv){
+    // Convertir a JPEG con fondo blanco para evitar fondo negro en PDF
+    const tmpCv=document.createElement('canvas');tmpCv.width=cv.width;tmpCv.height=cv.height;
+    const tmpCtx=tmpCv.getContext('2d');tmpCtx.fillStyle='#ffffff';tmpCtx.fillRect(0,0,tmpCv.width,tmpCv.height);
+    tmpCtx.drawImage(cv,0,0);firmaData=tmpCv.toDataURL('image/jpeg',0.95);
+  }
   const nomFirmante=document.getElementById('iNombreFirmante')?.value.trim()||'';
 
   // Inyectar firma en el doc antes de generar PDF
@@ -983,24 +1004,31 @@ async function guardar(){
 
   try{
     window.scrollTo(0,0);
-    await new Promise(r=>setTimeout(r,200));
+    await new Promise(r=>setTimeout(r,300));
     const el=document.getElementById('docPDF');
-    // Temporarily remove centering margin so html2canvas captures from x=0
-    const prevMargin=el.style.margin;const prevMaxW=el.style.maxWidth;const prevW=el.style.width;
-    el.style.margin='0';el.style.maxWidth='none';el.style.width='780px';
-    await new Promise(r=>setTimeout(r,100));
+    // Convertir todas las imágenes PNG con transparencia a JPEG para evitar fondo negro en html2canvas
+    const allImgs=[...el.querySelectorAll('img')];
+    const origImgSrcs=allImgs.map(i=>i.src);
+    await Promise.all(allImgs.map(async i=>{i.src=await pngToJpegWhite(i.src);}));
+
     let pdfBlob;
-    try{
-      pdfBlob=await html2pdf().set({
-        margin:[6,6,6,6],filename:`${LABEL_A[doc.tipo]} N°${num}.pdf`,
-        image:{type:'jpeg',quality:0.95},
-        html2canvas:{scale:2,useCORS:true,logging:false,scrollY:0,scrollX:0,windowWidth:792,backgroundColor:'#ffffff'},
-        jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
-        pagebreak:{mode:['css','legacy']}
-      }).from(el).outputPdf('blob');
-    }finally{
-      el.style.margin=prevMargin;el.style.maxWidth=prevMaxW;el.style.width=prevW;
-    }
+    pdfBlob=await html2pdf().set({
+      margin:[6,6,6,6],filename:`${LABEL_A[doc.tipo]} N°${num}.pdf`,
+      image:{type:'jpeg',quality:0.95},
+      html2canvas:{
+        scale:2,useCORS:true,logging:false,scrollY:0,scrollX:0,
+        windowWidth:800,backgroundColor:'#ffffff',
+        onclone:(clonedDoc)=>{
+          const wrap=clonedDoc.getElementById('docPDF');
+          if(wrap){wrap.style.margin='0';wrap.style.maxWidth='none';wrap.style.width='788px';}
+        }
+      },
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+      pagebreak:{mode:['css','legacy']}
+    }).from(el).outputPdf('blob');
+
+    // Restaurar imgs originales
+    allImgs.forEach((i,idx)=>{i.src=origImgSrcs[idx];});
 
     showProg('Subiendo a Dropbox...','Creando carpetas automáticamente');
 
